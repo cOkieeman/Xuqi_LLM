@@ -1,5 +1,7 @@
 # Xuqi LLM Chat
-
+<p align="center">
+  <img src="./assets/preview.png" alt="Xuqi LLM Chat WebUI Preview" width="80%">
+</p>
 一个本地运行的 AI 伴侣聊天项目，基于 `FastAPI + WebUI` 构建，支持多存档、角色卡、世界书、记忆库、差分立绘和桌面启动器。
 
 Made by `Frischar`.
