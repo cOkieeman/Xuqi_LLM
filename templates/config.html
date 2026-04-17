@@ -46,7 +46,7 @@
         <div class="section-head">
           <p class="eyebrow">Guide</p>
           <h2>配置总览</h2>
-          <p class="muted">这里保留模型、检索和界面设置。角色卡请去单独的 <code>Card Config</code> 页面。记忆库现在有单独的 <code>Memory</code> 页面，可以手动修改并作为固定前情提要持续投喂给模型。</p>
+          <p class="muted">这里保留模型、检索和界面设置。角色卡请去单独的 <code>Card</code> 页面。记忆库在 <code>Memory</code> 页面里维护，会作为固定前情提要持续投喂给模型。</p>
         </div>
         <div class="stats-row">
           <div class="stat-box">
@@ -67,8 +67,26 @@
           <p class="muted">兼容 OpenAI 风格接口，常见写法是 <code>.../v1</code>。</p>
         </div>
 
+        <div class="grid-two preset-row">
+          <div>
+            <label for="preset-provider">预设服务</label>
+            <select id="preset-provider">
+              <option value="custom">自定义</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="openai">OpenAI</option>
+              <option value="minimax">MiniMax</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="siliconflow">SiliconFlow</option>
+            </select>
+          </div>
+          <div class="button-row offset-top">
+            <button id="apply-preset" type="button" class="secondary">一键填入预设</button>
+          </div>
+        </div>
+
         <label for="llm-base-url">API URL</label>
         <input id="llm-base-url" value="{{ settings.llm_base_url }}" placeholder="例如 http://127.0.0.1:8000/v1" />
+        <p id="preset-helper" class="muted helper-text">可先选常见厂商预设，再按自己的模型名微调。</p>
 
         <label for="llm-api-key">API Key</label>
         <div class="inline-field">
@@ -226,6 +244,17 @@
       </section>
     </div>
 
+    <div id="result-modal" class="result-modal" hidden>
+      <div id="result-modal-backdrop" class="result-modal-backdrop"></div>
+      <div class="result-modal-card panel">
+        <div class="memory-card-head">
+          <strong id="result-modal-title">测试结果</strong>
+          <button id="result-modal-close" type="button" class="secondary compact">关闭</button>
+        </div>
+        <pre id="result-modal-body" class="result-modal-body"></pre>
+      </div>
+    </div>
+
     <script>
       const rootEl = document.documentElement;
       const bodyEl = document.body;
@@ -238,6 +267,49 @@
       const backgroundOverlayEl = document.getElementById("background-overlay");
       const backgroundOverlayValueEl = document.getElementById("background-overlay-value");
       const backgroundPreviewEl = document.getElementById("background-preview");
+      const resultModalEl = document.getElementById("result-modal");
+      const resultModalTitleEl = document.getElementById("result-modal-title");
+      const resultModalBodyEl = document.getElementById("result-modal-body");
+      const presetHelperEl = document.getElementById("preset-helper");
+
+      const LLM_PRESETS = {
+        custom: {
+          label: "自定义",
+          baseUrl: "",
+          model: "",
+          helper: "保留当前填写内容，自行输入 API URL 和模型名。",
+        },
+        deepseek: {
+          label: "DeepSeek",
+          baseUrl: "https://api.deepseek.com/v1",
+          model: "deepseek-chat",
+          helper: "官方接口一般直接填到 /v1，模型名通常可用 deepseek-chat。",
+        },
+        openai: {
+          label: "OpenAI",
+          baseUrl: "https://api.openai.com/v1",
+          model: "",
+          helper: "已填入官方兼容地址，模型名请按你账号可用模型自行填写。",
+        },
+        minimax: {
+          label: "MiniMax",
+          baseUrl: "https://api.minimaxi.com/v1",
+          model: "",
+          helper: "MiniMax 建议确认你自己的可用模型名后再保存。",
+        },
+        openrouter: {
+          label: "OpenRouter",
+          baseUrl: "https://openrouter.ai/api/v1",
+          model: "openrouter/auto",
+          helper: "OpenRouter 可先用 openrouter/auto，后续再切换到指定模型。",
+        },
+        siliconflow: {
+          label: "SiliconFlow",
+          baseUrl: "https://api.siliconflow.cn/v1",
+          model: "",
+          helper: "SiliconFlow 地址已填入，模型名请按你实际使用的供应模型填写。",
+        },
+      };
 
       const saveTimers = { settings: null };
 
@@ -263,6 +335,16 @@
 
       function setStatus(text) {
         statusEl.textContent = text;
+      }
+
+      function showResultModal(title, body) {
+        resultModalTitleEl.textContent = title;
+        resultModalBodyEl.textContent = body;
+        resultModalEl.hidden = false;
+      }
+
+      function hideResultModal() {
+        resultModalEl.hidden = true;
       }
 
       function scheduleSave(handler, text, delay = 600) {
@@ -367,6 +449,17 @@
         };
       }
 
+      function applyPresetSelection(presetKey) {
+        const preset = LLM_PRESETS[presetKey] || LLM_PRESETS.custom;
+        if (preset.baseUrl) {
+          document.getElementById("llm-base-url").value = preset.baseUrl;
+        }
+        if (preset.model) {
+          document.getElementById("llm-model").value = preset.model;
+        }
+        presetHelperEl.textContent = preset.helper;
+      }
+
       async function saveSettings(statusText = "设置已自动保存") {
         const data = await postJson("/api/settings", settingsPayload());
         applyTheme(data.settings.theme);
@@ -426,8 +519,10 @@
           await saveSettings("正在测试聊天模型...");
           const data = await postJson("/api/test-connection", {});
           setStatus(`聊天模型连接成功：${data.reply}`);
+          showResultModal("聊天模型测试成功", `模型响应：\n${data.reply}`);
         } catch (error) {
           setStatus(`连接失败：${error.message}`);
+          showResultModal("聊天模型测试失败", String(error.message || error));
         }
       });
 
@@ -436,8 +531,10 @@
           await saveSettings("正在测试嵌入模型...");
           const data = await postJson("/api/test-embedding", {});
           setStatus(`嵌入连接成功：共返回 ${data.count} 个向量，维度 ${data.dimension}`);
+          showResultModal("嵌入模型测试成功", `返回向量数：${data.count}\n向量维度：${data.dimension}`);
         } catch (error) {
           setStatus(`连接失败：${error.message}`);
+          showResultModal("嵌入模型测试失败", String(error.message || error));
         }
       });
 
@@ -537,9 +634,23 @@
         }
       });
 
+      document.getElementById("apply-preset").addEventListener("click", () => {
+        applyPresetSelection(document.getElementById("preset-provider").value);
+        scheduleSave(saveSettings, "已填入预设，正在保存...", 250);
+      });
+
+      document.getElementById("preset-provider").addEventListener("change", () => {
+        const preset = LLM_PRESETS[document.getElementById("preset-provider").value] || LLM_PRESETS.custom;
+        presetHelperEl.textContent = preset.helper;
+      });
+
+      document.getElementById("result-modal-close").addEventListener("click", hideResultModal);
+      document.getElementById("result-modal-backdrop").addEventListener("click", hideResultModal);
+
       toggleSecret("llm-api-key", "toggle-llm-api-key");
       toggleSecret("embedding-api-key", "toggle-embedding-api-key");
       toggleSecret("rerank-api-key", "toggle-rerank-api-key");
+      applyPresetSelection("custom");
       applyTheme({{ settings.theme | tojson }});
       applyUiOpacity({{ settings.ui_opacity | tojson }});
       applyBackground({{ settings.background_image_url | tojson }}, {{ settings.background_overlay | tojson }});

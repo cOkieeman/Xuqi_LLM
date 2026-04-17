@@ -14,8 +14,8 @@
   --assistant-alpha: 0.96;
   --panel: rgba(var(--panel-rgb), var(--panel-alpha));
   --panel-strong: rgba(var(--panel-strong-rgb), var(--panel-strong-alpha));
-  --line: rgba(99, 73, 56, 0.12);
-  --text: #36261d;
+  --line: rgba(99, 73, 56, 0.16);
+  --text: #2d1f18;
   --muted: #8a7361;
   --accent: #c8673b;
   --accent-dark: #a84f28;
@@ -126,20 +126,29 @@ body::after {
 
 .topnav {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   position: fixed;
-  top: 22px;
-  right: 24px;
+  top: 18px;
+  right: 20px;
   z-index: 120;
-  max-width: min(68vw, 980px);
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  padding: 12px;
+  max-width: calc(100vw - 40px);
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 10px;
   border: 1px solid var(--line);
   border-radius: 24px;
   background: color-mix(in srgb, var(--panel) 88%, transparent 12%);
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow);
+}
+
+.topnav::-webkit-scrollbar {
+  display: none;
 }
 
 .slot-toolbar {
@@ -207,12 +216,14 @@ body::after {
 .navlink,
 .ghost-link {
   width: auto;
-  padding: 10px 14px;
+  flex: 0 0 auto;
+  padding: 9px 12px;
   border-radius: 999px;
   border: 1px solid var(--line);
   color: var(--muted);
   text-decoration: none;
   background: color-mix(in srgb, var(--panel-strong) 92%, transparent 8%);
+  font-size: 14px;
   transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease;
 }
 
@@ -583,6 +594,12 @@ button.compact {
   margin-top: 10px;
 }
 
+.helper-text {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .check-chip {
   margin: 0;
   display: inline-flex;
@@ -840,6 +857,42 @@ button.compact {
   margin: 0;
 }
 
+.result-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.result-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 10, 16, 0.52);
+  backdrop-filter: blur(6px);
+}
+
+.result-modal-card {
+  position: relative;
+  z-index: 1;
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(76vh, 720px);
+  overflow: auto;
+}
+
+.result-modal-body {
+  margin: 0;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--input-bg) 96%, transparent 4%);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 1080px) {
   .config-shell,
   .config-shell.wide {
@@ -946,6 +999,10 @@ button.compact {
   gap: 10px;
 }
 
+.config-shell.compact .preset-row {
+  align-items: end;
+}
+
 .config-shell.compact .stats-row {
   gap: 10px;
 }
@@ -965,8 +1022,15 @@ button.compact {
 .config-shell.compact .card-builder,
 .config-shell.compact .card-grid,
 .config-shell.compact .card-column,
-.config-shell.compact .card-persona-grid {
+.config-shell.compact .card-persona-grid,
+.config-shell.compact .stage-grid {
   gap: 14px;
+}
+
+.field-note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .stats-row {
@@ -1050,6 +1114,11 @@ button.compact {
   margin-top: 12px;
 }
 
+.stage-grid {
+  display: grid;
+  gap: 12px;
+}
+
 .sub-title {
   margin-bottom: 8px;
   font-size: 13px;
@@ -1059,9 +1128,24 @@ button.compact {
 
 .card-persona-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   align-items: start;
   gap: 18px;
+}
+
+.persona-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.persona-toolbar h3 {
+  margin: 0;
+}
+
+.persona-card-head {
+  margin-bottom: 2px;
 }
 
 .card-builder input,

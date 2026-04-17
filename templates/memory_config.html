@@ -46,7 +46,7 @@
         <div class="section-head">
           <p class="eyebrow">Memory</p>
           <h2>记忆库管理</h2>
-          <p class="muted">这里的每一条记忆都会在每次聊天时作为固定前情提要投喂给模型。你可以手动新增、修改、删除，然后点保存立即生效。</p>
+          <p class="muted">这里的每一条记忆都会在每次聊天时作为固定前情提要投喂给模型。你可以手动新增、修改、删除，然后点击保存立即生效。</p>
         </div>
         <div class="stats-row">
           <div class="stat-box">
@@ -84,7 +84,7 @@
             <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要">{{ item.content }}</textarea>
 
             <label>标签</label>
-            <input class="memory-tags" value="{{ item.tags | join(', ') }}" placeholder="用英文逗号分隔，例如 日常, 关系, 设定" />
+            <input class="memory-tags" value="{{ item.tags | join(', ') }}" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
 
             <label>备注</label>
             <textarea class="memory-notes" rows="3" placeholder="补充说明，可选">{{ item.notes }}</textarea>
@@ -118,7 +118,7 @@
         <textarea class="memory-content" rows="4" placeholder="这里写给模型看的核心前情提要"></textarea>
 
         <label>标签</label>
-        <input class="memory-tags" placeholder="用英文逗号分隔，例如 日常, 关系, 设定" />
+        <input class="memory-tags" placeholder="用英文逗号分隔，例如：日常, 关系, 设定" />
 
         <label>备注</label>
         <textarea class="memory-notes" rows="3" placeholder="补充说明，可选"></textarea>
@@ -208,8 +208,7 @@
         card.querySelector(".memory-tags").value = Array.isArray(item.tags) ? item.tags.join(", ") : "";
         card.querySelector(".memory-notes").value = item.notes || "";
         card.querySelector(".memory-id").value = item.id || "";
-        const titleEl = card.querySelector(".memory-card-head strong");
-        titleEl.textContent = item.title ? item.title : "新记忆";
+        card.querySelector(".memory-card-head strong").textContent = item.title ? item.title : "新记忆";
         attachRemoveHandler(card);
         return card;
       }
@@ -259,19 +258,8 @@
         setStatus("记忆库已保存，并会在每次聊天时作为前情提要生效。");
       }
 
-      document.querySelectorAll(".memory-card").forEach((card) => {
-        attachRemoveHandler(card);
-      });
-
-      memoryListEl.addEventListener("input", (event) => {
-        const card = event.target.closest(".memory-card");
-        if (!card) return;
-        const titleText = card.querySelector(".memory-title").value.trim();
-        card.querySelector(".memory-card-head strong").textContent = titleText || "新记忆";
-      });
-
       document.getElementById("add-memory").addEventListener("click", () => {
-        memoryListEl.appendChild(createMemoryCard());
+        memoryListEl.prepend(createMemoryCard());
         updateMemoryCount();
         setStatus("已新增一条空白记忆。");
       });
@@ -318,10 +306,10 @@
         }
       });
 
-      updateMemoryCount();
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
       applyBackground(currentBackground, currentOverlay);
+      updateMemoryCount();
     </script>
   </body>
 </html>

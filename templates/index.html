@@ -332,6 +332,7 @@
 
       let runtimeState = loadRuntimeState();
       let worldbookEntries = [];
+      const streamingEntries = new Set();
 
       async function selectSlot(slotId) {
         await postJson("/api/slots/select", { slot_id: slotId });
@@ -700,18 +701,40 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
       }
 
+      function requestUiFrame(callback) {
+        if (document.hidden) {
+          setTimeout(callback, 0);
+          return;
+        }
+        requestAnimationFrame(callback);
+      }
+
       function scheduleBubbleRender(entry) {
         if (!entry || entry.framePending) return;
         entry.framePending = true;
-        requestAnimationFrame(() => {
+        requestUiFrame(() => {
           entry.framePending = false;
           renderBubbleContent(entry.bubble, entry.state);
           messagesEl.scrollTop = messagesEl.scrollHeight;
         });
       }
 
+      function flushPendingVisible(entry) {
+        if (!entry) return;
+        if (entry.pendingVisibleChars.length) {
+          entry.state.visible += entry.pendingVisibleChars.join("");
+          entry.pendingVisibleChars = [];
+        }
+        entry.typewriterActive = false;
+        scheduleBubbleRender(entry);
+      }
+
       function scheduleTypewriterTick(entry) {
         if (!entry || entry.typewriterActive) return;
+        if (document.hidden) {
+          flushPendingVisible(entry);
+          return;
+        }
         entry.typewriterActive = true;
 
         const tick = () => {
@@ -719,18 +742,27 @@
             entry.typewriterActive = false;
             return;
           }
+          if (document.hidden) {
+            flushPendingVisible(entry);
+            return;
+          }
           entry.state.visible += entry.pendingVisibleChars.shift();
           scheduleBubbleRender(entry);
-          requestAnimationFrame(tick);
+          requestUiFrame(tick);
         };
 
-        requestAnimationFrame(tick);
+        requestUiFrame(tick);
       }
 
       function appendVisibleDelta(entry, delta) {
         if (!entry) return;
         const chars = Array.from(String(delta || ""));
         if (!chars.length) return;
+        if (document.hidden) {
+          entry.state.visible += chars.join("");
+          scheduleBubbleRender(entry);
+          return;
+        }
         entry.pendingVisibleChars.push(...chars);
         scheduleTypewriterTick(entry);
       }
@@ -995,6 +1027,7 @@
         inputEl.value = "";
         setStatus("正在回复...");
         const assistantEntry = createMessage("assistant", "");
+        streamingEntries.add(assistantEntry);
         let finalReply = "";
         try {
           await streamChat({
@@ -1041,6 +1074,7 @@
                 assistantEntry.wrapper.remove();
               }
               updateSprite(data.sprite_tag || "");
+              streamingEntries.delete(assistantEntry);
             },
             onError(data) {
               throw new Error(data.detail || "流式请求失败");
@@ -1048,6 +1082,7 @@
           });
           setStatus("就绪");
         } catch (error) {
+          streamingEntries.delete(assistantEntry);
           assistantEntry.wrapper.remove();
           addMessage("assistant", `出错了：${error.message}`);
           renderRetrievedItems([]);
@@ -1102,6 +1137,12 @@
           await saveWorldbook();
         } catch (error) {
           setStatus(`世界书保存失败：${error.message}`);
+        }
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+          streamingEntries.forEach((entry) => flushPendingVisible(entry));
         }
       });
 

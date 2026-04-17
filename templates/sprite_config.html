@@ -80,7 +80,15 @@
 
         <div class="button-row">
           <button id="upload-sprite" type="button">上传当前表情</button>
+          <button id="bulk-import-sprites" type="button" class="secondary">批量导入立绘</button>
           <button id="reload-sprites" type="button" class="secondary">重新扫描目录</button>
+          <input
+            id="bulk-sprite-files"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            style="display: none"
+          />
         </div>
       </section>
 
@@ -270,6 +278,57 @@
         setStatus(`已上传表情：${data.uploaded?.tag || "未命名"}`);
       }
 
+      function inferTagFromFilename(filename) {
+        const raw = String(filename || "").replace(/\.[^.]+$/, "").trim();
+        return raw || "未命名";
+      }
+
+      async function uploadSpriteFileWithTag(file, tag) {
+        const formData = new FormData();
+        formData.append("tag", tag);
+        formData.append("file", file);
+        const response = await fetch("/api/sprites", { method: "POST", body: formData });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.detail || `上传失败：${file.name}`);
+        }
+        return response.json();
+      }
+
+      async function bulkImportSprites(files) {
+        const fileList = Array.from(files || []);
+        if (!fileList.length) {
+          throw new Error("请先选择图片文件。");
+        }
+
+        let lastData = null;
+        let successCount = 0;
+        const failed = [];
+
+        for (const file of fileList) {
+          const tag = inferTagFromFilename(file.name);
+          try {
+            lastData = await uploadSpriteFileWithTag(file, tag);
+            successCount += 1;
+            setStatus(`正在导入 ${successCount}/${fileList.length}：${tag}`);
+          } catch (error) {
+            failed.push(`${file.name}（${error.message}）`);
+          }
+        }
+
+        if (lastData) {
+          renderSprites(lastData.items || [], lastData.base_path || "");
+        } else {
+          await loadSprites();
+        }
+
+        if (failed.length) {
+          setStatus(`批量导入完成：成功 ${successCount} 张，失败 ${failed.length} 张。失败项：${failed.join("；")}`);
+        } else {
+          setStatus(`批量导入完成：成功导入 ${successCount} 张立绘。标签已按文件名自动生成。`);
+        }
+      }
+
       async function deleteSprite(filename) {
         const confirmed = window.confirm(`确定要删除立绘 ${filename} 吗？`);
         if (!confirmed) return;
@@ -283,6 +342,23 @@
           await uploadSprite();
         } catch (error) {
           setStatus(`上传失败：${error.message}`);
+        }
+      });
+
+      document.getElementById("bulk-import-sprites").addEventListener("click", () => {
+        document.getElementById("bulk-sprite-files").click();
+      });
+
+      document.getElementById("bulk-sprite-files").addEventListener("change", async (event) => {
+        const files = event.target.files;
+        if (!files || !files.length) return;
+
+        try {
+          await bulkImportSprites(files);
+        } catch (error) {
+          setStatus(`批量导入失败：${error.message}`);
+        } finally {
+          event.target.value = "";
         }
       });
 

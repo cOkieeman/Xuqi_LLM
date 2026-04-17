@@ -14,8 +14,6 @@ from app import BASE_DIR, app
 
 
 HOST = "127.0.0.1"
-PORT = 8000
-APP_URL = f"http://{HOST}:{PORT}/chat"
 WINDOW_SIZE = "1440,920"
 
 
@@ -32,6 +30,13 @@ def wait_for_port(host: str, port: int, timeout_seconds: float = 20.0) -> bool:
             return True
         time.sleep(0.25)
     return False
+
+
+def get_free_port(host: str = HOST) -> int:
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        sock.bind((host, 0))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return int(sock.getsockname()[1])
 
 
 def browser_profile_dir() -> Path:
@@ -58,11 +63,11 @@ def find_browser_executable() -> str | None:
     return None
 
 
-def start_local_server() -> tuple[uvicorn.Server, threading.Thread]:
+def start_local_server(port: int) -> tuple[uvicorn.Server, threading.Thread]:
     config = uvicorn.Config(
         app=app,
         host=HOST,
-        port=PORT,
+        port=port,
         reload=False,
         log_level="warning",
         access_log=False,
@@ -98,15 +103,16 @@ def main() -> None:
     server: uvicorn.Server | None = None
     server_thread: threading.Thread | None = None
     app_process: subprocess.Popen[str] | None = None
+    port = get_free_port()
+    app_url = f"http://{HOST}:{port}/chat"
 
     try:
-        if not is_port_open(HOST, PORT):
-            owns_server = True
-            server, server_thread = start_local_server()
-            if not wait_for_port(HOST, PORT):
-                raise RuntimeError("Local service failed to start in time.")
+        owns_server = True
+        server, server_thread = start_local_server(port)
+        if not wait_for_port(HOST, port):
+            raise RuntimeError("Local service failed to start in time.")
 
-        app_process = launch_app_window(APP_URL)
+        app_process = launch_app_window(app_url)
         if app_process is None:
             while True:
                 time.sleep(1.0)

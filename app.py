@@ -168,6 +168,63 @@ def list_sprite_assets(slot_id: str | None = None) -> list[dict[str, Any]]:
     return items
 
 
+def blank_persona() -> dict[str, str]:
+    return {
+        "name": "",
+        "description": "",
+        "personality": "",
+        "scenario": "",
+        "creator_notes": "",
+    }
+
+
+def default_personas(count: int = 3) -> dict[str, dict[str, str]]:
+    total = max(1, int(count or 1))
+    return {str(index): blank_persona() for index in range(1, total + 1)}
+
+
+def persona_sort_key(item: tuple[str, Any]) -> tuple[int, int | str]:
+    key = str(item[0]).strip()
+    if key.isdigit():
+        return (0, int(key))
+    return (1, key.lower())
+
+
+def iter_persona_items(personas: Any) -> list[tuple[str, Any]]:
+    if not isinstance(personas, dict):
+        return []
+    return sorted(personas.items(), key=persona_sort_key)
+
+
+def blank_plot_stage() -> dict[str, str]:
+    return {"description": "", "rules": ""}
+
+
+def default_plot_stages() -> dict[str, dict[str, str]]:
+    return {
+        "A": blank_plot_stage(),
+        "B": blank_plot_stage(),
+        "C": blank_plot_stage(),
+    }
+
+
+def stage_sort_key(item: tuple[str, Any]) -> tuple[int, str]:
+    key = str(item[0]).strip()
+    match = re.fullmatch(r"([A-Za-z]+)(\d+)?", key)
+    if match:
+        prefix = match.group(1).upper()
+        suffix = match.group(2) or ""
+        suffix_key = f"{int(suffix):08d}" if suffix.isdigit() else ""
+        return (0, f"{prefix}:{suffix_key}")
+    return (1, key.lower())
+
+
+def iter_plot_stage_items(plot_stages: Any) -> list[tuple[str, Any]]:
+    if not isinstance(plot_stages, dict):
+        return []
+    return sorted(plot_stages.items(), key=stage_sort_key)
+
+
 def default_role_card() -> dict[str, Any]:
     return {
         "name": "",
@@ -178,34 +235,8 @@ def default_role_card() -> dict[str, Any]:
         "scenario": "",
         "creator_notes": "",
         "tags": [],
-        "plotStages": {
-            "A": {"description": "", "rules": ""},
-            "B": {"description": "", "rules": ""},
-            "C": {"description": "", "rules": ""},
-        },
-        "personas": {
-            "1": {
-                "name": "",
-                "description": "",
-                "personality": "",
-                "scenario": "",
-                "creator_notes": "",
-            },
-            "2": {
-                "name": "",
-                "description": "",
-                "personality": "",
-                "scenario": "",
-                "creator_notes": "",
-            },
-            "3": {
-                "name": "",
-                "description": "",
-                "personality": "",
-                "scenario": "",
-                "creator_notes": "",
-            },
-        },
+        "plotStages": default_plot_stages(),
+        "personas": default_personas(3),
     }
 
 
@@ -636,42 +667,57 @@ def normalize_role_card(raw: Any) -> dict[str, Any]:
     card["tags"] = sanitize_tags(raw.get("tags", []))
 
     plot_stages = raw.get("plotStages", {})
-    if isinstance(plot_stages, dict):
-        for key in card["plotStages"]:
-            value = plot_stages.get(key, {})
-            if isinstance(value, dict):
-                card["plotStages"][key]["description"] = str(value.get("description", "")).strip()
-                card["plotStages"][key]["rules"] = str(value.get("rules", "")).strip()
+    normalized_plot_stages: dict[str, dict[str, str]] = {}
+    for source_key, value in iter_plot_stage_items(plot_stages):
+        if not isinstance(value, dict):
+            continue
+        stage_key = str(source_key).strip() or chr(ord("A") + len(normalized_plot_stages))
+        normalized_plot_stages[stage_key] = {
+            "description": str(value.get("description", "")).strip(),
+            "rules": str(value.get("rules", "")).strip(),
+        }
+    if normalized_plot_stages:
+        card["plotStages"] = normalized_plot_stages
 
     personas = raw.get("personas", {})
-    if isinstance(personas, dict):
-        persona_items: list[tuple[str, Any]]
-        if any(str(key) in card["personas"] for key in personas):
-            persona_items = [(key, personas.get(key, {})) for key in card["personas"]]
-        else:
-            persona_items = list(personas.items())[: len(card["personas"])]
+    normalized_personas: dict[str, dict[str, str]] = {}
+    for source_key, value in iter_persona_items(personas):
+        if not isinstance(value, dict):
+            continue
+        source_name = str(source_key).strip()
+        slot = source_name or str(len(normalized_personas) + 1)
+        raw_name = str(value.get("name", "")).strip()
+        display_name = raw_name or source_name
+        should_resolve_placeholder = (
+            not display_name
+            or (
+                bool(re.fullmatch(r"[A-Z]", display_name))
+                and any(
+                    str(value.get(field, "")).strip()
+                    for field in ["description", "scenario", "personality"]
+                )
+            )
+        )
+        if should_resolve_placeholder:
+            extracted_name = extract_persona_name_from_fields(
+                str(value.get("description", "")).strip(),
+                str(value.get("scenario", "")).strip(),
+                str(value.get("personality", "")).strip(),
+            )
+            if extracted_name:
+                display_name = extracted_name
+            elif source_name:
+                display_name = source_name
+        normalized_personas[slot] = {
+            "name": display_name,
+            "description": str(value.get("description", "")).strip(),
+            "personality": str(value.get("personality", "")).strip(),
+            "scenario": str(value.get("scenario", "")).strip(),
+            "creator_notes": str(value.get("creator_notes", "")).strip(),
+        }
 
-        for slot, item in zip(card["personas"], persona_items):
-            source_key, value = item
-            if isinstance(value, dict):
-                source_name = str(source_key).strip()
-                raw_name = str(value.get("name", "")).strip()
-                display_name = raw_name or source_name
-                if not display_name or re.fullmatch(r"[A-Z]", display_name):
-                    extracted_name = extract_persona_name_from_fields(
-                        str(value.get("description", "")).strip(),
-                        str(value.get("scenario", "")).strip(),
-                        str(value.get("personality", "")).strip(),
-                    )
-                    if extracted_name:
-                        display_name = extracted_name
-                    elif source_name and source_name not in {"1", "2", "3"}:
-                        display_name = source_name
-                card["personas"][slot]["name"] = display_name
-                card["personas"][slot]["description"] = str(value.get("description", "")).strip()
-                card["personas"][slot]["personality"] = str(value.get("personality", "")).strip()
-                card["personas"][slot]["scenario"] = str(value.get("scenario", "")).strip()
-                card["personas"][slot]["creator_notes"] = str(value.get("creator_notes", "")).strip()
+    if normalized_personas:
+        card["personas"] = normalized_personas
 
     return card
 
@@ -1090,7 +1136,7 @@ def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
     plot_stages = card.get("plotStages", {})
     if isinstance(plot_stages, dict):
         stage_lines = []
-        for key, value in plot_stages.items():
+        for key, value in iter_plot_stage_items(plot_stages):
             if not isinstance(value, dict):
                 continue
             desc = str(value.get("description", "")).strip()
@@ -1109,7 +1155,7 @@ def build_persona_from_role_card(card: dict[str, Any]) -> dict[str, str]:
     if isinstance(personas, dict):
         persona_lines = []
         persona_names = []
-        for key, value in personas.items():
+        for key, value in iter_persona_items(personas):
             if not isinstance(value, dict):
                 continue
             name = str(value.get("name", "")).strip() or f"Persona {key}"
@@ -1177,7 +1223,7 @@ def build_memories_from_role_card(card: dict[str, Any]) -> list[dict[str, Any]]:
 
     plot_stages = card.get("plotStages", {})
     if isinstance(plot_stages, dict):
-        for key, value in plot_stages.items():
+        for key, value in iter_plot_stage_items(plot_stages):
             if not isinstance(value, dict):
                 continue
             content = "\n".join(
@@ -1201,7 +1247,7 @@ def build_memories_from_role_card(card: dict[str, Any]) -> list[dict[str, Any]]:
 
     personas = card.get("personas", {})
     if isinstance(personas, dict):
-        for key, value in personas.items():
+        for key, value in iter_persona_items(personas):
             if not isinstance(value, dict):
                 continue
             content = "\n".join(
@@ -1410,6 +1456,18 @@ def should_retry_status_code(status_code: int) -> bool:
     if status_code in {408, 409, 425, 429}:
         return True
     return status_code >= 500
+
+
+async def read_response_text_safe(response: httpx.Response | None) -> str:
+    if response is None:
+        return ""
+    try:
+        return (await response.aread()).decode(response.encoding or "utf-8", errors="replace").strip()
+    except Exception:
+        try:
+            return response.text.strip()
+        except Exception:
+            return ""
 
 
 async def request_json(
@@ -2189,7 +2247,7 @@ async def stream_model_reply(
             break
         except httpx.HTTPStatusError as exc:
             last_error = exc
-            response_text = exc.response.text.strip() if exc.response is not None else ""
+            response_text = await read_response_text_safe(exc.response)
             last_error_detail = response_text[:500]
             status_code = exc.response.status_code if exc.response is not None else 0
             logger.warning(
@@ -2275,20 +2333,66 @@ def build_conversation_transcript(history: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def get_memory_fragment_style_profile() -> dict[str, str]:
+    persona = get_persona()
+    current_card = get_current_card().get("raw", {})
+    persona_name = str(persona.get("name", "")).strip() or "当前角色"
+
+    cast_names: list[str] = []
+    personas = current_card.get("personas", {})
+    if isinstance(personas, dict):
+        for _, value in iter_persona_items(personas):
+            if not isinstance(value, dict):
+                continue
+            name = str(value.get("name", "")).strip()
+            if name:
+                cast_names.append(name)
+
+    if cast_names:
+        narrator = " / ".join(cast_names)
+        style_hint = (
+            f"Use the speaking flavor of {narrator}. "
+            "Write it like a remembered fragment after the conversation, not an objective report. "
+            "Keep it intimate, natural, and slightly emotional."
+        )
+    else:
+        narrator = persona_name
+        style_hint = (
+            f"Use the speaking flavor of {persona_name}. "
+            "Write it like a remembered fragment after the conversation, not an objective report. "
+            "Keep it intimate, natural, and slightly emotional."
+        )
+
+    return {
+        "narrator": narrator,
+        "style_hint": style_hint,
+    }
+
+
 def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str, Any]:
     transcript = build_conversation_transcript(history)
     last_user = next(
         (str(item.get("content", "")).strip() for item in reversed(history) if item.get("role") == "user"),
         "",
     )
-    title_source = last_user or transcript or "Conversation Memory"
+    last_assistant = next(
+        (str(item.get("content", "")).strip() for item in reversed(history) if item.get("role") == "assistant"),
+        "",
+    )
+    profile = get_memory_fragment_style_profile()
+    title_source = last_user or last_assistant or transcript or "Memory Fragment"
     title = title_source[:18] + ("..." if len(title_source) > 18 else "")
-    compact = transcript[:120] + ("..." if len(transcript) > 120 else "")
+    if last_assistant:
+        fragment = last_assistant[:140] + ("..." if len(last_assistant) > 140 else "")
+    elif last_user:
+        fragment = f"{profile['narrator']}还记得你刚才说过：{last_user[:110]}"
+    else:
+        fragment = transcript[:140] + ("..." if len(transcript) > 140 else "")
     return {
-        "title": title or "Conversation Memory",
-        "content": compact or "A short long-term memory summary was created for this conversation.",
-        "tags": ["auto-memory", "summary"],
-        "notes": "",
+        "title": title or "Memory Fragment",
+        "content": fragment or f"{profile['narrator']}把这段对话记成了一小段模糊却温热的回忆。",
+        "tags": ["memory-fragment", "auto-memory"],
+        "notes": f"口吻参考：{profile['narrator']}",
     }
 
 
@@ -2299,36 +2403,49 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
 
     url = build_api_url(llm_config["base_url"], "chat/completions")
     transcript = build_conversation_transcript(history)
+    profile = get_memory_fragment_style_profile()
     schema_hint = (
         '{\n'
-        '  "title": "不超过20字的短标题",\n'
-        '  "content": "一条精炼完整的长期记忆短句",\n'
+        '  "title": "不超过20字的片段标题",\n'
+        '  "content": "一段像日记或回忆录摘句的记忆片段，1到3句",\n'
         '  "tags": ["tag1", "tag2"],\n'
-        '  "notes": "可为空字符串"\n'
+        '  "notes": "可写口吻说明或留空"\n'
         '}'
     )
     payload = {
         "model": llm_config["model"],
-        "temperature": 0.2,
+        "temperature": 0.45,
         "messages": [
             {
                 "role": "system",
                 "content": (
-                    "You are a dialogue memory formatter. "
+                    "You are a dialogue memory fragment formatter. "
                     "Return one strict JSON object only. "
                     "Do not output markdown fences, explanation, roleplay, XML, or any extra text. "
                     "The JSON object must contain exactly these keys: title, content, tags, notes. "
-                    "title must be a short title within 20 Chinese characters or 40 ASCII chars. "
-                    "content must be one polished complete sentence for long-term memory. "
-                    "tags must be an array of short strings. "
-                    "notes may be an empty string. "
+                    "title must be a short fragment title within 20 Chinese characters or 40 ASCII chars. "
+                    "content must be a compact memory fragment in Chinese, written like a diary fragment or remembered scene excerpt. "
+                    "content should be 1 to 3 sentences, vivid but concise, and preserve the emotional speaking flavor of the current speaker cast. "
+                    "Do not write objective report language such as 用户、AI、虚拟角色、进行了互动、恢复正常对话. "
+                    "Do not summarize like meeting minutes. "
+                    "Write as if the characters themselves are remembering this scene afterwards. "
+                    "tags must be an array of short strings. Include 'memory-fragment'. "
+                    "notes may be an empty string, or a very short note about whose voice this fragment resembles. "
                     "Output must start with { and end with }."
                 ),
             },
             {
                 "role": "user",
                 "content": (
-                    "请把这段完整对话整理成长期记忆。\n"
+                    "请把这段完整对话整理成一条长期记忆片段。\n"
+                    "要求：\n"
+                    "- 不要写成客观摘要或记录报告\n"
+                    "- 要像对话结束后留下的一小段回忆、日记摘句、心声片段\n"
+                    f"- 口吻参考：{profile['style_hint']}\n"
+                    f"- 说话人参考：{profile['narrator']}\n"
+                    "- title 保持短小\n"
+                    "- content 必须是记忆片段，不要出现“用户与角色进行了互动”这类说法\n"
+                    "- tags 里请包含 memory-fragment\n"
                     "只返回 JSON 对象，不要返回任何解释。\n"
                     f"格式示例：\n{schema_hint}\n\n"
                     f"对话内容：\n{transcript}"
@@ -2386,7 +2503,8 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
                     "content": (
                         "Convert the provided text into one strict JSON object only. "
                         "Do not output markdown, explanation, or extra text. "
-                        "The object must contain exactly these keys: title, content, tags, notes."
+                        "The object must contain exactly these keys: title, content, tags, notes. "
+                        "content must remain a diary-like memory fragment, not an objective summary."
                     ),
                 },
                 {
@@ -2415,10 +2533,13 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
 
 
 def sanitize_memory_summary(payload: dict[str, Any], *, fallback: dict[str, Any]) -> dict[str, Any]:
+    profile = get_memory_fragment_style_profile()
     title = str(payload.get("title", "")).strip() or fallback["title"]
     content = str(payload.get("content", "")).strip() or fallback["content"]
-    tags = sanitize_tags(payload.get("tags", fallback["tags"])) or ["auto-memory", "summary"]
-    notes = str(payload.get("notes", "")).strip()
+    tags = sanitize_tags(payload.get("tags", fallback["tags"])) or ["auto-memory", "memory-fragment"]
+    if "memory-fragment" not in tags:
+        tags.insert(0, "memory-fragment")
+    notes = str(payload.get("notes", "")).strip() or str(fallback.get("notes", "")).strip() or f"口吻参考：{profile['narrator']}"
 
     return {
         "id": f"memory-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
@@ -2635,6 +2756,7 @@ async def config_page(request: Request) -> HTMLResponse:
 async def card_config_page(request: Request) -> HTMLResponse:
     active_slot = get_active_slot_id()
     current_card = get_current_card(active_slot)
+    card_template = normalize_role_card(current_card.get("raw", {}))
     return templates.TemplateResponse(
         request,
         "card_config.html",
@@ -2642,7 +2764,9 @@ async def card_config_page(request: Request) -> HTMLResponse:
             "settings": get_settings(active_slot),
             "cards": list_role_card_files(),
             "current_card": current_card,
-            "card_template": normalize_role_card(current_card.get("raw", {})),
+            "card_template": card_template,
+            "stage_items": iter_plot_stage_items(card_template.get("plotStages", {})),
+            "persona_items": iter_persona_items(card_template.get("personas", {})),
             "active_slot": active_slot,
             "slot_registry": get_slot_registry(),
         },
