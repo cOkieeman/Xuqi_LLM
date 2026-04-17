@@ -123,7 +123,7 @@
         <div>
           <p class="eyebrow">Sidebar</p>
           <h2>运行时配置</h2>
-          <p class="muted">这里修改的是当前存档配置，会和 Config 页面保持一致。</p>
+          <p class="muted">这里的 API Key、模型参数和界面设置只保存在浏览器本地。</p>
         </div>
         <button id="close-drawer" class="secondary compact" type="button">关闭</button>
       </div>
@@ -302,6 +302,7 @@
       const worldbookListEl = document.getElementById("worldbook-list");
 
       const ACTIVE_SLOT = {{ active_slot | tojson }};
+      const STORAGE_KEY = `xuqi.runtime.sidebar.v1.${ACTIVE_SLOT}`;
       const DEFAULT_SLOT_SPRITE_BASE_PATH = {{ settings.sprite_base_path | tojson }};
       const initialState = {
         llm_base_url: {{ settings.llm_base_url | tojson }},
@@ -329,8 +330,7 @@
         sprite_base_path: DEFAULT_SLOT_SPRITE_BASE_PATH
       };
 
-      let runtimeState = { ...initialState };
-      let drawerSaveTimer = null;
+      let runtimeState = loadRuntimeState();
       let worldbookEntries = [];
       const streamingEntries = new Set();
 
@@ -354,71 +354,29 @@
         window.location.reload();
       }
 
+      function loadRuntimeState() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+          const merged = { ...initialState, ...saved };
+          if (!merged.sprite_base_path || merged.sprite_base_path === "/static/sprites") {
+            merged.sprite_base_path = DEFAULT_SLOT_SPRITE_BASE_PATH;
+          }
+          return merged;
+        } catch {
+          return { ...initialState };
+        }
+      }
+
+      function persistRuntimeState() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(runtimeState));
+      }
+
       function setStatus(text) {
         statusEl.textContent = text;
       }
 
       function drawerInput(id) {
         return document.getElementById(id);
-      }
-
-      function settingsPayloadFromRuntimeState() {
-        return {
-          llm_base_url: runtimeState.llm_base_url,
-          llm_api_key: runtimeState.llm_api_key,
-          llm_model: runtimeState.llm_model,
-          temperature: runtimeState.temperature,
-          history_limit: runtimeState.history_limit,
-          request_timeout: runtimeState.request_timeout,
-          demo_mode: runtimeState.demo_mode,
-          embedding_base_url: runtimeState.embedding_base_url,
-          embedding_api_key: runtimeState.embedding_api_key,
-          embedding_model: runtimeState.embedding_model,
-          embedding_fields: runtimeState.embedding_fields,
-          retrieval_top_k: runtimeState.retrieval_top_k,
-          rerank_enabled: runtimeState.rerank_enabled,
-          rerank_base_url: runtimeState.rerank_base_url,
-          rerank_api_key: runtimeState.rerank_api_key,
-          rerank_model: runtimeState.rerank_model,
-          rerank_top_n: runtimeState.rerank_top_n,
-          theme: runtimeState.theme,
-          ui_opacity: runtimeState.ui_opacity,
-          background_image_url: runtimeState.background_image_url,
-          background_overlay: runtimeState.background_overlay,
-          sprite_enabled: runtimeState.sprite_enabled,
-          sprite_base_path: runtimeState.sprite_base_path,
-        };
-      }
-
-      async function saveDrawerState(statusText = "当前存档配置已保存") {
-        const data = await postJson("/api/settings", settingsPayloadFromRuntimeState());
-        runtimeState = {
-          ...runtimeState,
-          ...data.settings,
-          sprite_base_path: data.settings.sprite_base_path || runtimeState.sprite_base_path || DEFAULT_SLOT_SPRITE_BASE_PATH,
-        };
-        applyTheme(runtimeState.theme);
-        applyUiOpacity(runtimeState.ui_opacity);
-        applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
-        syncDrawerFromState();
-        setStatus(statusText);
-        return data;
-      }
-
-      function scheduleDrawerSave(text = "正在保存当前存档配置...", delay = 350) {
-        if (drawerSaveTimer) {
-          clearTimeout(drawerSaveTimer);
-        }
-        setStatus(text);
-        drawerSaveTimer = setTimeout(async () => {
-          try {
-            await saveDrawerState("当前存档配置已保存");
-          } catch (error) {
-            setStatus(`保存失败：${error.message}`);
-          } finally {
-            drawerSaveTimer = null;
-          }
-        }, delay);
       }
 
       function syncDrawerFromState() {
@@ -481,10 +439,10 @@
           sprite_base_path: drawerInput("drawer-sprite-base-path").value.trim() || {{ settings.sprite_base_path | tojson }},
         };
 
+        persistRuntimeState();
         applyTheme(runtimeState.theme);
         applyUiOpacity(runtimeState.ui_opacity);
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
-        scheduleDrawerSave();
       }
 
       function openDrawer() {
@@ -1025,8 +983,9 @@
         const data = await response.json();
         runtimeState.background_image_url = data.url || "";
         drawerInput("drawer-background-url").value = runtimeState.background_image_url;
+        persistRuntimeState();
         applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
-        await saveDrawerState("背景图已上传并同步到当前存档配置");
+        setStatus("背景图已上传到本地 static/uploads");
       }
 
       function buildChatRuntimeConfig() {
@@ -1213,7 +1172,6 @@
         }
       });
 
-      runtimeState = { ...initialState };
       applyTheme(runtimeState.theme);
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);

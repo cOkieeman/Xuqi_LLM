@@ -1,12 +1,40 @@
 {
-    "settings":  {
-                     "enabled":  true,
-                     "max_hits":  3,
-                     "default_case_sensitive":  false,
-                     "default_match_mode":  "any",
-                     "default_whole_word":  false
-                 },
-    "entries":  [
-
-                ]
+  "settings": {
+    "enabled": true,
+    "max_hits": 3,
+    "default_case_sensitive": false,
+    "default_whole_word": false,
+    "default_match_mode": "any",
+    "default_secondary_mode": "all"
+  },
+  "entries": [
+    {
+      "id": "worldbook-manual-1776440064558-0",
+      "title": "我式你",
+      "trigger": "发的是",
+      "secondary_trigger": "",
+      "content": "1243412",
+      "enabled": true,
+      "priority": 100,
+      "case_sensitive": false,
+      "whole_word": false,
+      "match_mode": "any",
+      "secondary_mode": "all",
+      "comment": ""
+    },
+    {
+      "id": "worldbook-manual-1776440035730-0",
+      "title": "我式",
+      "trigger": "123",
+      "secondary_trigger": "",
+      "content": "发送地方",
+      "enabled": true,
+      "priority": 100,
+      "case_sensitive": false,
+      "whole_word": false,
+      "match_mode": "any",
+      "secondary_mode": "all",
+      "comment": ""
+    }
+  ]
 }
