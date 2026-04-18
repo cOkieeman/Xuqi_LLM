@@ -9,3 +9,11 @@ build/
 dist/
 *.spec
 tmp_index_script*.js
+data/**/*.json
+data/**/*.jsonc
+data/.slot_migration_done
+cards/*.json
+cards/*.txt
+!cards/template_multi_role_card.json
+!cards/template_role_card.json
+!cards/template_single_role_card.json
