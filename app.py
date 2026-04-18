@@ -1844,6 +1844,14 @@ def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
     )
 
 
+def build_thinking_prompt() -> str:
+    return (
+        "If the model supports visible reasoning, start each reply with a short reasoning block wrapped in "
+        "<thinking>...</thinking> or <think>...</think>, then output the final visible answer. "
+        "Keep the reasoning concise, but always close the tag properly."
+    )
+
+
 def normalize_sprite_tag(tag: str) -> str:
     text = str(tag or "").strip()
     if not text:
@@ -1881,14 +1889,13 @@ def extract_reply_parts(raw_text: str) -> dict[str, Any]:
     if stripped.startswith("[") and "]" not in stripped[:48]:
         return {"sprite_tag": "", "visible": "", "think": "", "thinking": False}
 
-    sprite_tag, cleaned = extract_sprite_tag(text)
-    source = cleaned or text
+    source = text
 
     think_parts: list[str] = []
     visible_parts: list[str] = []
     cursor = 0
     thinking = False
-    open_tag_pattern = re.compile(r"<think\b[^>]*>", flags=re.IGNORECASE)
+    open_tag_pattern = re.compile(r"<(think|thinking)\b[^>]*>", flags=re.IGNORECASE)
 
     while True:
         match = open_tag_pattern.search(source, cursor)
@@ -1902,7 +1909,12 @@ def extract_reply_parts(raw_text: str) -> dict[str, Any]:
         if start > cursor:
             visible_parts.append(source[cursor:start])
 
-        close_match = re.search(r"</think>", source[open_end:], flags=re.IGNORECASE)
+        tag_name = str(match.group(1) or "think").lower()
+        close_match = re.search(
+            rf"</{re.escape(tag_name)}>",
+            source[open_end:],
+            flags=re.IGNORECASE,
+        )
         if not close_match:
             trailing = source[open_end:].strip()
             if trailing:
@@ -1919,6 +1931,7 @@ def extract_reply_parts(raw_text: str) -> dict[str, Any]:
 
     visible = "".join(visible_parts)
     visible = re.sub(r"\n{3,}", "\n\n", visible).strip()
+    sprite_tag, visible = extract_sprite_tag(visible)
     think = "\n\n".join(part for part in think_parts if part).strip()
     return {
         "sprite_tag": sprite_tag,
@@ -2064,6 +2077,10 @@ def build_messages(
     retrieval_prompt = build_retrieval_prompt(retrieved_items or [])
     if retrieval_prompt:
         system_sections.append(retrieval_prompt)
+
+    thinking_prompt = build_thinking_prompt()
+    if thinking_prompt:
+        system_sections.append(thinking_prompt)
 
     sprite_prompt = build_sprite_prompt(llm_config)
     if sprite_prompt:
@@ -3265,7 +3282,9 @@ async def api_reset() -> dict[str, Any]:
 async def api_export_history() -> FileResponse:
     slot_id = get_active_slot_id()
     history = get_conversation(slot_id)
-    export_path = EXPORT_DIR / f"{slot_id}_chat_history_export.json"
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H_%M")
+    export_filename = f"{slot_id}_chat_history_export-{timestamp}.json"
+    export_path = EXPORT_DIR / export_filename
     persist_json(
         export_path,
         history,
@@ -3273,6 +3292,6 @@ async def api_export_history() -> FileResponse:
     )
     return FileResponse(
         path=export_path,
-        filename=f"{slot_id}_chat_history_export.json",
+        filename=export_filename,
         media_type="application/json",
     )

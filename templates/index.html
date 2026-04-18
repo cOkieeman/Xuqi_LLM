@@ -526,19 +526,21 @@
 
         const thinkParts = [];
         const visibleParts = [];
-        const openTagPattern = /<think\b[^>]*>/gi;
+        const openTagPattern = /<(think|thinking)\b[^>]*>/gi;
         let cursor = 0;
         let match;
 
         while ((match = openTagPattern.exec(text)) !== null) {
           const start = match.index;
           const openEnd = openTagPattern.lastIndex;
+          const tagName = (match[1] || "think").toLowerCase();
+          const closeTag = `</${tagName}>`;
 
           if (start > cursor) {
             visibleParts.push(text.slice(cursor, start));
           }
 
-          const closeIndex = text.toLowerCase().indexOf("</think>", openEnd);
+          const closeIndex = text.toLowerCase().indexOf(closeTag, openEnd);
           if (closeIndex === -1) {
             const trailingThink = text.slice(openEnd).trim();
             if (trailingThink) {
@@ -552,7 +554,7 @@
           if (inner) {
             thinkParts.push(inner);
           }
-          cursor = closeIndex + "</think>".length;
+          cursor = closeIndex + closeTag.length;
           openTagPattern.lastIndex = cursor;
         }
 
