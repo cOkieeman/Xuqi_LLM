@@ -72,11 +72,11 @@
           <div class="section-head">
             <p class="eyebrow">Library</p>
             <h2>预设列表</h2>
-            <p class="muted">点击左侧项目可切换编辑对象；设为当前后才会用于聊天。</p>
+            <p class="muted">点击左侧项目可切换编辑对象；只有点“设为当前”后才会用于聊天。</p>
           </div>
           <div class="button-row"><button id="create-preset" type="button">新增</button><button id="duplicate-preset" type="button" class="secondary">复制</button></div>
           <div class="button-row"><button id="activate-preset" type="button" class="secondary">设为当前</button><button id="delete-preset" type="button" class="secondary">删除</button></div>
-          <div class="button-row"><button id="import-preset" type="button" class="secondary">导入</button><button id="export-preset" type="button" class="secondary">导出当前</button><input id="import-preset-file" type="file" accept=".json,application/json,text/plain" style="display:none" /></div>
+          <div class="button-row"><button id="import-preset" type="button" class="secondary">导入</button><button id="export-preset" type="button" class="secondary">导出当前</button><input id="import-preset-file" type="file" accept=".json,.jsonc,application/json,text/plain" style="display:none" /></div>
           <div id="preset-items" class="preset-list"></div>
         </aside>
         <main class="preset-editor-grid">
@@ -149,8 +149,8 @@
       function applyMutex(changedKey){ const opposites = MODULE_MUTEX[changedKey] || []; const changedEl = document.querySelector(`.preset-module[data-key="${changedKey}"]`); if(!changedEl?.checked) return; opposites.forEach((key)=>{ const el=document.querySelector(`.preset-module[data-key="${key}"]`); if(el) el.checked=false; }); }
       async function reloadStore(){ const data = await fetch('/api/preset').then((response)=>response.json()); presetStore = data.preset_store || {active_preset_id:'',presets:[]}; editingPresetId = presetStore.active_preset_id || presetStore.presets?.[0]?.id || ''; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('预设已重新读取。'); }
       async function saveStore(){ syncEditorToStore(); const data = await postJson('/api/preset', presetStore); presetStore = data.preset_store || presetStore; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('预设已保存。'); }
-      async function createPreset(){ syncEditorToStore(); const name = window.prompt('新预设名称：', '新预设'); const data = await postJson('/api/preset/create', {name: name || ''}); presetStore = data.preset_store || presetStore; editingPresetId = presetStore.active_preset_id; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('已新增预设。'); }
-      async function duplicatePreset(){ syncEditorToStore(); const data = await postJson('/api/preset/duplicate', {preset_id: editingPresetId}); presetStore = data.preset_store || presetStore; editingPresetId = presetStore.active_preset_id; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('已复制当前预设。'); }
+      async function createPreset(){ syncEditorToStore(); const name = window.prompt('新预设名称：', '新预设'); const data = await postJson('/api/preset/create', {name: name || ''}); presetStore = data.preset_store || presetStore; editingPresetId = data.created_preset_id || presetStore.active_preset_id; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('已新增预设（未自动设为当前）。'); }
+      async function duplicatePreset(){ syncEditorToStore(); const data = await postJson('/api/preset/duplicate', {preset_id: editingPresetId}); presetStore = data.preset_store || presetStore; editingPresetId = data.duplicated_preset_id || presetStore.active_preset_id; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('已复制当前预设（未自动设为当前）。'); }
       async function activatePreset(){ syncEditorToStore(); await saveStore(); const data = await postJson('/api/preset/activate', {preset_id: editingPresetId}); presetStore = data.preset_store || presetStore; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('已切换当前激活预设。'); }
       async function deletePreset(){ const current = getPresetById(editingPresetId); if(!current) return; const confirmed = window.confirm(`要删除预设「${current.name || '未命名预设'}」吗？`); if(!confirmed) return; const data = await postJson('/api/preset/delete', {preset_id: editingPresetId}); presetStore = data.preset_store || presetStore; editingPresetId = presetStore.active_preset_id || presetStore.presets?.[0]?.id || ''; renderPresetList(); applyPreset(getPresetById(editingPresetId)); setStatus('预设已删除。'); }
       presetListEl.addEventListener('input', (event)=>{ const card = event.target.closest('.preset-card'); if(!card) return; card.querySelector('.memory-card-head strong').textContent = card.querySelector('.preset-block-name').value.trim() || '新规则块'; applySearch(); });

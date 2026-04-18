@@ -239,7 +239,6 @@ def create_preset_in_store(store: dict[str, Any], name: str = "") -> dict[str, A
     new_name = str(name or "").strip()[:64] or f"预设 {len(sanitized['presets']) + 1}"
     new_preset = default_single_preset(generate_preset_id(), new_name)
     sanitized["presets"].append(new_preset)
-    sanitized["active_preset_id"] = new_preset["id"]
     return sanitized
 
 def activate_preset_in_store(store: dict[str, Any], preset_id: str) -> dict[str, Any]:
@@ -261,7 +260,6 @@ def duplicate_preset_in_store(store: dict[str, Any], preset_id: str) -> dict[str
     duplicated["id"] = generate_preset_id()
     duplicated["name"] = (str(target.get("name", "预设")).strip() or "预设") + "（副本）"
     sanitized["presets"].append(duplicated)
-    sanitized["active_preset_id"] = duplicated["id"]
     return sanitized
 
 def delete_preset_from_store(store: dict[str, Any], preset_id: str) -> dict[str, Any]:

@@ -3101,12 +3101,14 @@ async def api_save_preset(payload: PresetStorePayload) -> dict[str, Any]:
 async def api_create_preset(payload: PresetCreatePayload) -> dict[str, Any]:
     active_slot = get_active_slot_id()
     store = create_preset_in_store(get_preset_store(active_slot), payload.name)
+    created_preset = store.get("presets", [])[-1] if store.get("presets") else {}
     store = save_preset_store(store, active_slot)
     return {
         "ok": True,
         "active_slot": active_slot,
         "preset_store": store,
         "active_preset": get_active_preset_from_store(store),
+        "created_preset_id": str(created_preset.get("id", "")).strip(),
         "preset_debug": build_preset_debug_payload(active_slot),
     }
 
@@ -3129,12 +3131,14 @@ async def api_activate_preset(payload: PresetActionPayload) -> dict[str, Any]:
 async def api_duplicate_preset(payload: PresetActionPayload) -> dict[str, Any]:
     active_slot = get_active_slot_id()
     store = duplicate_preset_in_store(get_preset_store(active_slot), payload.preset_id)
+    duplicated_preset = store.get("presets", [])[-1] if store.get("presets") else {}
     store = save_preset_store(store, active_slot)
     return {
         "ok": True,
         "active_slot": active_slot,
         "preset_store": store,
         "active_preset": get_active_preset_from_store(store),
+        "duplicated_preset_id": str(duplicated_preset.get("id", "")).strip(),
         "preset_debug": build_preset_debug_payload(active_slot),
     }
 
@@ -3167,6 +3171,57 @@ async def api_export_current_preset() -> FileResponse:
     return FileResponse(target, media_type="application/json", filename=filename)
 
 
+def strip_json_comments(raw_text: str) -> str:
+    result: list[str] = []
+    in_string = False
+    escape = False
+    in_line_comment = False
+    in_block_comment = False
+    index = 0
+    while index < len(raw_text):
+        char = raw_text[index]
+        next_char = raw_text[index + 1] if index + 1 < len(raw_text) else ""
+        if in_line_comment:
+            if char == "\n":
+                in_line_comment = False
+                result.append(char)
+            index += 1
+            continue
+        if in_block_comment:
+            if char == "*" and next_char == "/":
+                in_block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if in_string:
+            result.append(char)
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+        if char == '"':
+            in_string = True
+            result.append(char)
+            index += 1
+            continue
+        if char == "/" and next_char == "/":
+            in_line_comment = True
+            index += 2
+            continue
+        if char == "/" and next_char == "*":
+            in_block_comment = True
+            index += 2
+            continue
+        result.append(char)
+        index += 1
+    return "".join(result)
+
+
 @app.post("/api/preset/import")
 async def api_import_preset(payload: PresetImportPayload) -> dict[str, Any]:
     active_slot = get_active_slot_id()
@@ -3176,7 +3231,10 @@ async def api_import_preset(payload: PresetImportPayload) -> dict[str, Any]:
     try:
         parsed = json.loads(raw_text)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=f"预设 JSON 解析失败：{exc}") from exc
+        try:
+            parsed = json.loads(strip_json_comments(raw_text))
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"预设 JSON 解析失败：{exc}") from exc
 
     current_store = get_preset_store(active_slot)
     imported_store = sanitize_preset_store(parsed)
