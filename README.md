@@ -3,62 +3,71 @@
 <p align="center">
   <img src="./assets/preview.png" alt="Xuqi LLM Chat WebUI Preview" width="80%">
 </p>
-一个本地运行的 AI WebUI 项目，基于 FastAPI 构建，支持多存档、角色设定管理、世界书、记忆库、差分立绘和桌面启动器。
 
-Made by `Frischar`and`manbo`
+一个本地运行的 AI 伴侣聊天项目，基于 `FastAPI + WebUI` 构建，支持角色卡、记忆库、世界书、预设、差分立绘、创意工坊和桌面启动器。
 
-本项目当前仍在持续完善中。
+Made by `Frischar` and `manbo`
+
+本项目当前仍在持续完善中。  
 如在使用过程中遇到问题，欢迎提交 Issue 进行反馈与交流。
 
-开发过程使用 AI（`AI coding`） 辅助完成。
+开发过程使用 AI（`AI coding`）辅助完成。
 
+## 现在的项目状态
 
+- `/` 会直接跳转到 `/chat`
+- 当前运行数据以全局方式管理
+- 人设卡可以随时加载
+- 记忆、世界书、预设都支持独立导入导出
+- 设置页支持把“当前人设卡 + 记忆 + 世界书 + 预设”打包导出为一个 ZIP
 
-## 更新日志v1.1
+## 最近更新
 
-- 补充了世界书相关页面入口：
-  - `/config/worldbook`
-  - `/config/worldbook/entries`
-- 补充了角色卡模板说明，默认只保留：
-  - `cards/template_role_card.json`
-- 补充了双击启动脚本的 Python 检测说明：
-  - 会检查是否安装 Python
-  - 会检查版本是否至少为 `3.10`
-  - 未安装时会给出下载提示
-- 补充了“未配置嵌入模型 / 重排序模型时仍可正常聊天”的说明。
+- 重构了底层代码结构：页面路由、配置接口、聊天接口、数据模型、世界书逻辑和创意工坊逻辑都从 `app.py` 中拆出
+- 运行时数据改为全局管理，不再以旧的多存档槽位为主
+- 补充了记忆、世界书、预设的独立导入导出能力
+- 设置页新增“当前人设卡 + 记忆 + 世界书 + 预设”组合包导出
+- 聊天页新增 Prompt 打包预览，能直接查看当前轮注入了哪些上下文
+- 移除了旧欢迎页，首页现在直接进入聊天页
 
 ## 项目特点
 
 - 本地 WebUI，开箱即用
-- 多存档隔离
-- 角色卡导入、编辑、导出
-- 世界书设置页与词条管理页
-- 可编辑记忆库
-- 差分立绘与表情标签切换
-- 背景图、主题、透明度等界面设置
 - OpenAI 兼容聊天接口
-- 可接入嵌入模型与重排序模型
 - 流式输出
-- 可封包为桌面启动器
+- 角色卡导入、编辑、导出、热切换
+- 记忆库独立维护，支持导入导出
+- 世界书设置页与词条管理页，支持按需触发
+- 预设独立管理，支持导入导出与一键切换
+- 差分立绘与角色头像
+- 背景图、主题、透明度等界面设置
+- 创意工坊规则、阶段推进与资源上传
+- 聊天侧栏可预览本轮 Prompt 打包结果
+- 可选接入嵌入模型与重排序模型
+- 支持封包为桌面启动器
 
 ## 页面入口
 
-- `/`
-  欢迎页
 - `/chat`
   主聊天页
 - `/config`
   常规配置页
+- `/config/preset`
+  预设管理页
+- `/config/user`
+  用户资料页
 - `/config/card`
-  角色卡配置页
+  角色卡页
+- `/config/workshop`
+  创意工坊页
 - `/config/memory`
-  记忆库配置页
-- `/config/sprite`
-  立绘管理页
+  记忆库页
 - `/config/worldbook`
   世界书设置页
 - `/config/worldbook/entries`
   世界书词条管理页
+- `/config/sprite`
+  立绘管理页
 
 ## 快速启动
 
@@ -81,7 +90,7 @@ Made by `Frischar`and`manbo`
 ### 方式二：命令行启动
 
 ```powershell
-cd "G:\xuqi_llm聊天_github"
+cd "E:\AI chat 项目\Xuqi_LLM"
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -92,9 +101,9 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 `http://127.0.0.1:8000`
 
-## 使用说明
+## 基本使用
 
-### 聊天模型
+### 1. 配置聊天模型
 
 在 `Config` 页填写：
 
@@ -104,50 +113,46 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 只要接口兼容 OpenAI Chat Completions 风格，就可以直接接入。
 
-### 嵌入模型与重排序
+### 2. 加载角色卡
 
-可选接入：
+角色卡本身是独立的人设资产，可以从 `cards/` 目录读取，也可以在页面里导入、编辑和导出。
+
+当前默认模板：
+
+- [cards/template_role_card.json](./cards/template_role_card.json)
+
+### 3. 管理记忆、世界书和预设
+
+- 记忆库：在 `/config/memory` 维护，可独立导入导出
+- 世界书：在 `/config/worldbook` 和 `/config/worldbook/entries` 维护，可独立导入导出
+- 预设：在 `/config/preset` 维护，可独立导入导出
+
+设置页还可以直接导出当前整套组合包：
+
+- 当前角色卡
+- 当前记忆
+- 当前世界书
+- 当前预设
+
+### 4. 可选的检索增强
+
+可以额外配置：
 
 - 嵌入模型
 - 重排序模型
 
-未配置时，主聊天功能仍可正常运行，只是不会启用检索增强链路。
+未配置时，主聊天功能仍可正常运行，只是不会启用对应的检索增强链路。
 
-### 存档机制
+### 5. Prompt 预览
 
-默认提供 3 个存档槽位：
+聊天页侧栏支持查看当前轮的 Prompt 打包结果，方便排查：
 
-- `slot_1`
-- `slot_2`
-- `slot_3`
-
-每个槽位独立保存：
-
-- 人设
-- 聊天记录
-- 记忆库
-- 世界书
-- 当前角色卡
-- 立绘目录
-- 部分本地运行时配置
-
-立绘默认按槽位读取：
-
-- `/static/sprites/slot_1`
-- `/static/sprites/slot_2`
-- `/static/sprites/slot_3`
-
-### 角色卡
-
-支持：
-
-- 从 `cards/` 目录加载角色卡
-- 在页面内编辑角色卡
-- 导出当前角色卡
-
-仓库默认只保留一张模板角色卡：
-
-- [cards/template_role_card.json](./cards/template_role_card.json)
+- 系统提示
+- 角色卡设定
+- 记忆与长期信息
+- 世界书命中内容
+- 最近聊天记录
+- 本轮用户输入
 
 ## 封包与启动器
 
@@ -157,12 +162,11 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 `封包器.bat`
 
-封包后的启动器行为：
+封包后的启动器会：
 
-- 单个 `exe` 启动
-- 自动拉起本地服务
+- 启动本地服务
 - 自动打开独立窗口
-- 关闭窗口后程序退出
+- 关闭窗口后退出程序
 
 运行数据会优先生成在 `exe` 同目录，例如：
 
@@ -179,24 +183,31 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 ```text
 .
 |-- app.py
+|-- app_models.py
+|-- page_routes.py
+|-- config_api_routes.py
+|-- chat_api_routes.py
+|-- worldbook_logic.py
+|-- workshop_logic.py
+|-- slot_runtime.py
 |-- launcher.py
+|-- preset_rules.py
 |-- requirements.txt
 |-- README.md
+|-- LICENSE
 |-- 启动webui.bat
 |-- 封包器.bat
 |-- app_icon.ico
 |-- cards/
 |   `-- template_role_card.json
 |-- data/
-|   |-- persona.json
-|   |-- settings.json
-|   |-- save_slots.json
-|   `-- slots/
 |-- templates/
-|   |-- welcome.html
 |   |-- index.html
 |   |-- config.html
+|   |-- preset.html
+|   |-- user_config.html
 |   |-- card_config.html
+|   |-- workshop_config.html
 |   |-- memory_config.html
 |   |-- sprite_config.html
 |   |-- worldbook_config.html
@@ -209,8 +220,13 @@ uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 ## 开发入口
 
-- 后端主入口：`app.py`
-- 桌面启动器入口：`launcher.py`
+- 应用启动与共享核心逻辑：`app.py`
+- 页面路由：`page_routes.py`
+- 配置相关 API：`config_api_routes.py`
+- 聊天相关 API：`chat_api_routes.py`
+- 数据模型：`app_models.py`
+- 世界书逻辑：`worldbook_logic.py`
+- 创意工坊逻辑：`workshop_logic.py`
 - 页面模板：`templates/`
 - 样式文件：`static/styles.css`
 
