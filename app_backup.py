@@ -3299,8 +3299,8 @@ def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str
         (str(item.get("content", "")).strip() for item in reversed(history) if item.get("role") == "user"),
         "",
     )
-    title_source = last_user or transcript or "对话记忆"
-    title = compact_text(title_source, 32) or "对话记忆"
+    title_source = last_user or transcript or "Conversation Memory"
+    title = compact_text(title_source, 32) or "Conversation Memory"
 
     highlighted_turns: list[str] = []
     for item in history[-8:]:
@@ -3308,20 +3308,20 @@ def fallback_memory_from_conversation(history: list[dict[str, Any]]) -> dict[str
         content = compact_text(item.get("content", ""), 110)
         if role not in {"user", "assistant"} or not content:
             continue
-        speaker = "用户" if role == "user" else "AI"
-        highlighted_turns.append(f"{speaker}：{content}")
+        speaker = "User" if role == "user" else "AI"
+        highlighted_turns.append(f"{speaker}: {content}")
 
     recent_exchange = " | ".join(highlighted_turns)
     compact = recent_exchange or compact_text(transcript, 420)
     notes_parts = []
     if last_user:
-        notes_parts.append(f"用户最后一次请求：{compact_text(last_user, 140)}")
+        notes_parts.append(f"Latest user request: {compact_text(last_user, 140)}")
     if highlighted_turns:
-        notes_parts.append(f"最近关键轮次：{recent_exchange}")
+        notes_parts.append(f"Recent key turns: {recent_exchange}")
     return {
         "title": title,
-        "content": compact or "系统已为本轮对话生成一条长期记忆摘要。",
-        "tags": ["自动记忆", "对话总结"],
+        "content": compact or "A detailed long-term memory summary was created for this conversation.",
+        "tags": ["auto-memory", "summary"],
         "notes": "\n".join(notes_parts).strip(),
     }
 
@@ -3334,13 +3334,59 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
     url = build_api_url(llm_config["base_url"], "chat/completions")
     transcript = build_conversation_transcript(history)
     schema_hint = (
-        "{\n"
-        "  \"title\": \"简短中文标题\",\n"
-        "  \"content\": \"一段较详细的中文长期记忆总结，覆盖重要事件、决定、结果、情绪变化和未解决事项\",\n"
-        "  \"tags\": [\"标签1\", \"标签2\", \"标签3\"],\n"
-        "  \"notes\": \"可选补充细节，例如人名、地名、约定、数字、时间点和待办事项\"\n"
-        "}"
+        '{\n'
+        '  "title": "short topic title",\n'
+        '  "content": "a detailed long-term memory summary that covers the important events, decisions, outcomes, and unresolved threads",\n'
+        '  "tags": ["tag1", "tag2", "tag3"],\n'
+        '  "notes": "optional extra specifics such as names, promises, locations, numbers, and unresolved items"\n'
+        '}'
     )
+    payload = {
+        "model": llm_config["model"],
+        "temperature": 0.2,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a dialogue memory formatter for long-term chat memory. "
+                    "Return one strict JSON object only. "
+                    "Do not output markdown fences, explanation, roleplay, XML, or any extra text. "
+                    "The JSON object must contain exactly these keys: title, content, tags, notes. "
+                    "Capture concrete events instead of vague themes. "
+                    "If multiple important events happened, include all of them. "
+                    "Prefer specifics: requests, decisions, promises, outcomes, emotional turning points, changes of state, and unresolved follow-ups. "
+                    "title must be a short topic title within 32 Chinese characters or 64 ASCII chars. "
+                    "content must be a detailed but compact memory summary, usually 2 to 5 sentences. "
+                    "content should normally be at least 120 Chinese characters or 220 ASCII chars when enough detail exists. "
+                    "tags must be an array of 2 to 6 short strings. "
+                    "notes may be empty, but should include extra specifics when useful. "
+                    "Output must start with { and end with }."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Summarize the full conversation below into one long-term memory entry.\n"
+                    "Do not omit important incidents just to keep it short.\n"
+                    "Focus on what actually happened, what changed, what was decided, what was promised, and what still matters later.\n"
+                    "Return JSON only.\n"
+                    f"Format example:\n{schema_hint}\n\n"
+                    f"Conversation:\n{transcript}"
+                ),
+            },
+        ],
+    }
+    data = await request_json(
+        url=url,
+        api_key=llm_config["api_key"],
+        payload=payload,
+        request_timeout=int(llm_config["request_timeout"]),
+    )
+
+    try:
+        text = str(data["choices"][0]["message"]["content"]).strip()
+    except (KeyError, IndexError, TypeError) as exc:
+        raise ValueError("invalid summary payload") from exc
 
     def parse_summary_json(candidate: str) -> dict[str, Any]:
         cleaned = str(candidate or "").strip()
@@ -3365,81 +3411,10 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
             raise ValueError("summary json missing required keys")
         return parsed
 
-    def is_mostly_english_summary(payload: dict[str, Any]) -> bool:
-        tags = payload.get("tags", [])
-        if isinstance(tags, list):
-            tags_text = " ".join(str(item) for item in tags)
-        else:
-            tags_text = str(tags or "")
-
-        combined = " ".join(
-            [
-                str(payload.get("title", "") or ""),
-                str(payload.get("content", "") or ""),
-                str(payload.get("notes", "") or ""),
-                tags_text,
-            ]
-        ).strip()
-
-        if not combined:
-            return False
-
-        english_count = len(re.findall(r"[A-Za-z]", combined))
-        chinese_count = len(re.findall(r"[\u4e00-\u9fff]", combined))
-        return english_count >= max(40, chinese_count * 2) and chinese_count < 40
-
-    payload = {
-        "model": llm_config["model"],
-        "temperature": 0.2,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "你是用于长期记忆归档的对话总结器。"
-                    "你必须只返回一个严格 JSON 对象。"
-                    "不要输出 markdown 代码块、解释、旁白、角色扮演内容、XML 或任何额外文本。"
-                    "JSON 对象必须且只能包含这四个键：title、content、tags、notes。"
-                    "总结时要记录具体事件，不要只写空泛主题。"
-                    "如果发生了多个重要事件，要一并写入。"
-                    "优先保留具体信息：请求、决定、承诺、结果、情绪转折、状态变化、后续待处理事项。"
-                    "title 必须是简短中文标题，长度不超过 32 个汉字或 64 个 ASCII 字符。"
-                    "content 必须是较详细但紧凑的中文总结，通常 2 到 5 句。"
-                    "在信息足够时，content 通常不少于 120 个汉字或 220 个 ASCII 字符。"
-                    "tags 必须是 2 到 6 个短标签，优先使用简体中文；专有名词可保留原文。"
-                    "notes 可以为空，但在有帮助时应补充人名、地点、时间、数字、约定和未解决事项。"
-                    "除专有名词、产品名、缩写外，title、content、notes 必须使用简体中文。"
-                    "如果原对话以中文为主，禁止输出整段英文总结。"
-                    "输出必须以 { 开始，并以 } 结束。"
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "请把下面完整对话总结为一条长期记忆。\n"
-                    "不要为了简短而省略重要事件。\n"
-                    "重点总结：实际发生了什么、有什么变化、做了什么决定、承诺了什么、后续还有什么重要事项。\n"
-                    "只返回 JSON。\n"
-                    f"格式示例：\n{schema_hint}\n\n"
-                    f"对话内容：\n{transcript}"
-                ),
-            },
-        ],
-    }
-    data = await request_json(
-        url=url,
-        api_key=llm_config["api_key"],
-        payload=payload,
-        request_timeout=int(llm_config["request_timeout"]),
-    )
-
-    try:
-        text = str(data["choices"][0]["message"]["content"]).strip()
-    except (KeyError, IndexError, TypeError) as exc:
-        raise ValueError("invalid summary payload") from exc
-
     try:
         summary = parse_summary_json(text)
         logger.info("Automatic memory summary parsed as strict JSON on first pass.")
+        return summary
     except ValueError:
         logger.warning("Automatic memory summary was not strict JSON, trying one repair pass.")
         repair_payload = {
@@ -3449,19 +3424,17 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
                 {
                     "role": "system",
                     "content": (
-                        "请把提供的内容修复为一个严格 JSON 对象。"
-                        "不要输出 markdown、解释或额外文本。"
-                        "对象必须且只能包含这四个键：title、content、tags、notes。"
-                        "除专有名词外，title、content、notes 必须使用简体中文。"
+                        "Convert the provided text into one strict JSON object only. "
+                        "Do not output markdown, explanation, or extra text. "
+                        "The object must contain exactly these keys: title, content, tags, notes."
                     ),
                 },
                 {
                     "role": "user",
                     "content": (
-                        "请将下面内容修复为严格 JSON。\n"
-                        "如果原文已经是 JSON，请只修正格式，不要扩写。\n"
-                        f"格式示例：\n{schema_hint}\n\n"
-                        f"原始内容：\n{text}"
+                        "Repair the following content into strict JSON.\n"
+                        f"Format example:\n{schema_hint}\n\n"
+                        f"Original content:\n{text}"
                     ),
                 },
             ],
@@ -3478,60 +3451,13 @@ async def request_conversation_summary_with_model(history: list[dict[str, Any]])
             raise ValueError("invalid summary repair payload") from exc
         summary = parse_summary_json(repaired_text)
         logger.info("Automatic memory summary repaired into strict JSON successfully.")
+        return summary
 
-    if is_mostly_english_summary(summary):
-        logger.warning("Automatic memory summary is mostly English, trying one Chinese rewrite pass.")
-        rewrite_payload = {
-            "model": llm_config["model"],
-            "temperature": 0.0,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "你是 JSON 语言修正器。"
-                        "请在不改变原意的前提下，把输入中的长期记忆内容改写为简体中文。"
-                        "只返回一个严格 JSON 对象。"
-                        "不要输出 markdown、解释或额外文本。"
-                        "对象必须且只能包含这四个键：title、content、tags、notes。"
-                        "除专有名词、产品名、缩写外，title、content、notes 必须使用简体中文。"
-                        "tags 优先使用简体中文，专有名词可保留原文。"
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "请把下面 JSON 中的长期记忆内容改写为简体中文，并保持原意。\n"
-                        "不要丢失事件、决定、承诺、结果、情绪变化和未解决事项。\n"
-                        "只返回 JSON。\n\n"
-                        f"原始 JSON：\n{json.dumps(summary, ensure_ascii=False, indent=2)}"
-                    ),
-                },
-            ],
-        }
-
-        try:
-            rewrite_data = await request_json(
-                url=url,
-                api_key=llm_config["api_key"],
-                payload=rewrite_payload,
-                request_timeout=int(llm_config["request_timeout"]),
-            )
-            rewrite_text = str(rewrite_data["choices"][0]["message"]["content"]).strip()
-            rewritten_summary = parse_summary_json(rewrite_text)
-            if not is_mostly_english_summary(rewritten_summary):
-                summary = rewritten_summary
-                logger.info("Automatic memory summary rewritten into Chinese successfully.")
-            else:
-                logger.warning("Chinese rewrite pass still looks mostly English, keeping previous summary.")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Chinese rewrite pass failed, keeping previous summary: %s", exc)
-
-    return summary
 
 def sanitize_memory_summary(payload: dict[str, Any], *, fallback: dict[str, Any]) -> dict[str, Any]:
     title = str(payload.get("title", "")).strip() or fallback["title"]
     content = str(payload.get("content", "")).strip() or fallback["content"]
-    tags = sanitize_tags(payload.get("tags", fallback["tags"])) or ["自动记忆", "对话总结"]
+    tags = sanitize_tags(payload.get("tags", fallback["tags"])) or ["auto-memory", "summary"]
     notes = str(payload.get("notes", "")).strip() or str(fallback.get("notes", "")).strip()
 
     normalized_content = re.sub(r"\s+", " ", content).strip()

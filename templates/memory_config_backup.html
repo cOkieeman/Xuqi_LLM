@@ -609,31 +609,9 @@
       let currentOutlineItems = [];
       let currentActiveOutlineId = "";
       let isMerging = false;
-      const DELETE_SOURCES_PREF_KEY = "xuqi_memory_delete_sources_toggle";
 
       function setStatus(text) {
         statusEl.textContent = text || "就绪";
-      }
-
-      function getDeleteSourcesToggle() {
-        return document.getElementById("delete-sources-toggle");
-      }
-
-      function loadDeleteSourcesPreference() {
-        const toggle = getDeleteSourcesToggle();
-        if (!toggle) return;
-        const stored = window.localStorage.getItem(DELETE_SOURCES_PREF_KEY);
-        if (stored === "true") {
-          toggle.checked = true;
-        } else if (stored === "false") {
-          toggle.checked = false;
-        }
-      }
-
-      function saveDeleteSourcesPreference() {
-        const toggle = getDeleteSourcesToggle();
-        if (!toggle) return;
-        window.localStorage.setItem(DELETE_SOURCES_PREF_KEY, toggle.checked ? "true" : "false");
       }
 
       function setMergeButtonLoading(loading, message = "") {
@@ -1185,14 +1163,6 @@
         [...memoryListEl.querySelectorAll(".memory-card")].forEach((card) => setMemoryCollapsed(card, false));
         setStatus("已展开当前列表中的全部原记忆。");
       });
-
-      document.getElementById("delete-sources-toggle").addEventListener("change", () => {
-        saveDeleteSourcesPreference();
-        const enabled = document.getElementById("delete-sources-toggle").checked;
-        setStatus(`已${enabled ? "开启" : "关闭"}“合并成功后删除原记忆”。`);
-      });
-
-      loadDeleteSourcesPreference();
 
       applyTheme(currentTheme);
       applyUiOpacity(currentOpacity);
