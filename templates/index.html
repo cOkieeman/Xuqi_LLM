@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Xuqi LLM Chat</title>
     <link rel="stylesheet" href="/static/styles.css" />
+    {% for mod in registered_mods or [] %}
+      {% for href in mod.hooks.chat_styles or [] %}
+    <link rel="stylesheet" href="{{ href }}" data-mod-hook="{{ mod.slug }}" />
+      {% endfor %}
+    {% endfor %}
 
     <style>
       .message {
@@ -2742,5 +2747,10 @@
         renderWorldbookEditor();
       });
     </script>
+    {% for mod in registered_mods or [] %}
+      {% for src in mod.hooks.chat_scripts or [] %}
+    <script src="{{ src }}" data-mod-hook="{{ mod.slug }}"></script>
+      {% endfor %}
+    {% endfor %}
   </body>
 </html>

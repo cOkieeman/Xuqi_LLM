@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -23,20 +24,66 @@ class ModSpec:
     directory: Path
     route_path: str
     mount_path: str
+    hooks: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "slug": self.slug,
             "name": self.name,
             "label": self.label,
             "route_path": self.route_path,
             "mount_path": self.mount_path,
+            "hooks": {name: list(items) for name, items in self.hooks.items()},
         }
 
 
 def slugify_mod_name(name: str) -> str:
     normalized = SLUG_SANITIZE_RE.sub("-", name.strip().lower()).strip("-")
     return normalized or "mod"
+
+
+def read_mod_manifest(directory: Path) -> dict[str, Any]:
+    manifest_path = directory / "mod.json"
+    if not manifest_path.exists():
+        return {}
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        logger.exception("Failed to read mod manifest: %s", manifest_path)
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def normalize_hook_url(mount_path: str, value: Any) -> str:
+    text = str(value or "").strip()
+    if not text or text.startswith(("http://", "https://", "//")):
+        return ""
+    if text.startswith("/mods/"):
+        return text
+    if text.startswith("/"):
+        return f"{mount_path}{text}"
+    return f"{mount_path}/{text.lstrip('/')}"
+
+
+def normalize_hooks(mount_path: str, raw: Any) -> dict[str, tuple[str, ...]]:
+    hooks: dict[str, tuple[str, ...]] = {}
+    if not isinstance(raw, dict):
+        return hooks
+    for name, values in raw.items():
+        if isinstance(values, str):
+            candidates = [values]
+        elif isinstance(values, list):
+            candidates = values
+        else:
+            continue
+        urls = tuple(
+            url
+            for url in (normalize_hook_url(mount_path, item) for item in candidates)
+            if url
+        )
+        if urls:
+            hooks[str(name)] = urls
+    return hooks
 
 
 def discover_mods(mods_dir: Path) -> list[ModSpec]:
@@ -49,7 +96,9 @@ def discover_mods(mods_dir: Path) -> list[ModSpec]:
         if not (child / "app.py").exists():
             continue
         slug = slugify_mod_name(child.name)
-        label = child.name.title()
+        mount_path = f"/mods/{slug}/app"
+        manifest = read_mod_manifest(child)
+        label = str(manifest.get("label", "") or child.name.title()).strip()
         specs.append(
             ModSpec(
                 slug=slug,
@@ -57,7 +106,8 @@ def discover_mods(mods_dir: Path) -> list[ModSpec]:
                 label=label,
                 directory=child,
                 route_path=f"/mods/{slug}",
-                mount_path=f"/mods/{slug}/app",
+                mount_path=mount_path,
+                hooks=normalize_hooks(mount_path, manifest.get("hooks")),
             )
         )
     return specs

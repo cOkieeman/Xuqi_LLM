@@ -1,13 +1,17 @@
 {% set current_path = request.url.path %}
-{% set mod_state = namespace(has_worldbook_maker=false) %}
+{% set mod_state = namespace(has_worldbook_maker=false, has_tts_studio=false) %}
 {% for mod in registered_mods or [] %}
   {% if mod.slug == 'worldbook-maker' %}
     {% set mod_state.has_worldbook_maker = true %}
+  {% endif %}
+  {% if mod.slug == 'tts-studio' %}
+    {% set mod_state.has_tts_studio = true %}
   {% endif %}
 {% endfor %}
 {% set settings_active = current_path == '/config' or current_path == '/config/user' or current_path == '/config/workshop' or current_path == '/config/sprite' %}
 {% set persona_active = current_path == '/config/card' or current_path == '/config/preset' or current_path == '/config/memory' %}
 {% set worldbook_active = current_path.startswith('/config/worldbook') or current_path.startswith('/mods/worldbook-maker') %}
+{% set tts_active = current_path.startswith('/mods/tts-studio') %}
 
 <nav class="topnav topnav-grouped" aria-label="Primary navigation">
   <details class="nav-group{% if current_path == '/chat' %} active-group{% endif %}">
@@ -18,6 +22,17 @@
       </div>
     </div>
   </details>
+
+  {% if mod_state.has_tts_studio %}
+  <details class="nav-group{% if tts_active %} active-group{% endif %}">
+    <summary class="nav-group-summary">TTS</summary>
+    <div class="nav-group-panel">
+      <div class="nav-group-links">
+        <a class="navlink{% if tts_active %} active{% endif %}" href="/mods/tts-studio">TTS Studio</a>
+      </div>
+    </div>
+  </details>
+  {% endif %}
 
   <details class="nav-group{% if settings_active %} active-group{% endif %}">
     <summary class="nav-group-summary">设置</summary>
