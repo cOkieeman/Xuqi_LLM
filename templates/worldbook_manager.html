@@ -10,26 +10,95 @@
         color: var(--text);
       }
 
-      .worldbook-overview-stats {
+      .worldbook-overview-strip {
+        display: flex;
         align-items: stretch;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--panel-strong) 88%, transparent 12%);
+      }
+
+      .worldbook-overview-pills {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .worldbook-overview-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 6px 11px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--input-bg);
+        color: var(--muted);
+        white-space: nowrap;
+        font-size: 0.86rem;
+      }
+
+      .worldbook-overview-pill strong,
+      .worldbook-overview-pill a {
+        color: var(--text);
+        font-size: 0.96rem;
+        font-weight: 800;
+        text-decoration: none;
       }
 
       .worldbook-status-box {
-        flex: 1 1 360px;
-        min-width: min(420px, 100%);
+        flex: 1 1 520px;
+        min-width: min(520px, 100%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 12px;
+        border: 1px solid rgba(238, 169, 79, 0.44);
+        border-left: 5px solid rgba(238, 169, 79, 0.82);
+        border-radius: 16px;
+        background: linear-gradient(90deg, rgba(238, 169, 79, 0.16), color-mix(in srgb, var(--input-bg) 92%, transparent 8%));
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      }
+
+      .worldbook-status-box .worldbook-status-label {
+        flex: 0 0 auto;
+        color: var(--text);
+        font-size: 0.84rem;
+        font-weight: 900;
+        white-space: nowrap;
       }
 
       .worldbook-status-box .status-line {
         display: block;
+        min-width: 0;
         margin: 0;
         line-height: 1.45;
-        white-space: normal;
-        word-break: break-word;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        word-break: keep-all;
       }
 
       .worldbook-status-box.is-dirty {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.14);
+        border-color: rgba(238, 169, 79, 0.72);
+        border-left-color: rgba(238, 169, 79, 0.95);
+        background: linear-gradient(90deg, rgba(238, 169, 79, 0.22), rgba(94, 194, 168, 0.08));
+        box-shadow: 0 0 0 2px rgba(238, 169, 79, 0.16), 0 8px 18px rgba(0, 0, 0, 0.08);
+      }
+
+      @media (max-width: 1100px) {
+        .worldbook-overview-strip {
+          flex-direction: column;
+        }
+
+        .worldbook-status-box {
+          min-width: 0;
+        }
       }
 
       .config-shell.compact {
@@ -1529,6 +1598,67 @@
           max-height: 220px;
         }
       }
+      /* Light theme: keep top overview consistent with preset stat cards. */
+      html:not([data-theme="dark"]) .worldbook-overview-strip {
+        border-color: rgba(152, 110, 78, 0.24);
+        background: rgba(250, 242, 234, 0.70);
+        box-shadow: none;
+      }
+
+      html:not([data-theme="dark"]) .worldbook-overview-pill {
+        border-color: rgba(152, 110, 78, 0.28);
+        background: rgba(255, 248, 241, 0.90);
+        color: #7a5a43;
+        box-shadow: none;
+      }
+
+      html:not([data-theme="dark"]) .worldbook-overview-pill strong {
+        color: #35251b;
+      }
+
+      html:not([data-theme="dark"]) .worldbook-overview-pill .ghost-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 28px;
+        margin: -2px -4px -2px 0;
+        padding: 4px 11px;
+        border: 1px solid rgba(176, 109, 55, 0.38);
+        border-radius: 999px;
+        background: rgba(255, 250, 244, 0.92);
+        color: #4d382a;
+        box-shadow: none;
+      }
+
+      html:not([data-theme="dark"]) .worldbook-overview-pill .ghost-link:hover {
+        border-color: rgba(176, 109, 55, 0.58);
+        background: rgba(247, 234, 220, 0.96);
+        transform: translateY(-1px);
+      }
+
+      html:not([data-theme="dark"]) .worldbook-status-box {
+        border-color: rgba(152, 110, 78, 0.28);
+        border-left: 1px solid rgba(152, 110, 78, 0.28);
+        background: rgba(255, 248, 241, 0.90);
+        box-shadow: none;
+      }
+
+      html:not([data-theme="dark"]) .worldbook-status-box .worldbook-status-label {
+        color: #7a5a43;
+      }
+
+      html:not([data-theme="dark"]) .worldbook-status-box .status-line {
+        color: #35251b;
+        font-weight: 800;
+      }
+
+      html:not([data-theme="dark"]) .worldbook-status-box.is-dirty {
+        border-color: rgba(238, 169, 79, 0.62);
+        border-left: 1px solid rgba(238, 169, 79, 0.62);
+        background: rgba(255, 246, 234, 0.94);
+        box-shadow: 0 0 0 2px rgba(238, 169, 79, 0.08);
+      }
+
     </style>
   </head>
   <body>
@@ -1555,17 +1685,13 @@
           <h2>世界书词条管理</h2>
           <p class="muted">支持标题、主关键词、副关键词、常驻/关键词触发、主副组关系、组别、概率、黏性、冷却、顺序，以及角色定义前/后与聊天内注入等字段。</p>
         </div>
-        <div class="stats-row worldbook-overview-stats">
-          <div class="stat-box">
-            <span class="stat-label">当前条数</span>
-            <strong id="worldbook-count">{{ worldbook_count }}</strong>
+        <div class="worldbook-overview-strip">
+          <div class="worldbook-overview-pills">
+            <span class="worldbook-overview-pill">当前条数 <strong id="worldbook-count">{{ worldbook_count }}</strong></span>
+            <span class="worldbook-overview-pill">快速入口 <a class="ghost-link" href="/config/worldbook">打开触发设置</a></span>
           </div>
-          <div class="stat-box">
-            <span class="stat-label">快速入口</span>
-            <strong><a class="ghost-link" href="/config/worldbook">打开触发设置</a></strong>
-          </div>
-          <div id="worldbook-status-box" class="stat-box worldbook-status-box">
-            <span class="stat-label">当前状态</span>
+          <div id="worldbook-status-box" class="worldbook-status-box">
+            <span class="worldbook-status-label">当前状态</span>
             <strong id="status-text" class="status-line strong">就绪</strong>
           </div>
         </div>

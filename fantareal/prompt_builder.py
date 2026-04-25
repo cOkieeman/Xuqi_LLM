@@ -5,6 +5,18 @@ from typing import Any, Callable
 
 _DEPS: dict[str, Callable[..., Any]] = {}
 
+V4F_OUTPUT_GUARD_MARKER = "[[RUNTIME_ONLY:V4F_OUTPUT_GUARD]]"
+V4F_OUTPUT_GUARD_PROMPT = (
+    "【V4F本轮输出守卫】\n"
+    "本段是本轮回复前的临近约束，只用于稳定 DeepSeek V4-Flash 的 RP 输出。\n"
+    "严格遵守当前角色卡、预设、世界书、记忆和用户指定的输出格式。\n"
+    "禁止输出规则解释、分析标题、总结列表、自我说明或与剧情无关的补充说明。\n"
+    "严禁替用户补写动作、台词、心理、决定、情绪结论和身体反应。\n"
+    "每轮至少保留一次非用户角色的细微反应描写，可从眼神、停顿、呼吸、手指动作、身体距离或语气变化中选择。\n"
+    "不要直接用“她很感动 / 她很害羞 / 她很难过”等情绪结论替代描写，要通过动作、对白和场景互动表现。\n"
+    "结尾停在仍在继续的互动节点，不要写成总结、落幕、升华或强行收束。"
+)
+
 
 def configure_prompt_builder(**deps: Callable[..., Any]) -> None:
     _DEPS.update({key: value for key, value in deps.items() if callable(value)})
@@ -18,6 +30,19 @@ def _dep(name: str) -> Callable[..., Any]:
             "Call configure_prompt_builder(...) during app startup."
         )
     return fn
+
+
+def _optional_dep(name: str) -> Callable[..., Any] | None:
+    fn = _DEPS.get(name)
+    return fn if callable(fn) else None
+
+
+def _extract_runtime_guard_from_preset(preset_prompt: str) -> tuple[str, str]:
+    text = str(preset_prompt or "")
+    if V4F_OUTPUT_GUARD_MARKER not in text:
+        return text.strip(), ""
+    cleaned = text.replace(V4F_OUTPUT_GUARD_MARKER, "").strip()
+    return cleaned, V4F_OUTPUT_GUARD_PROMPT.strip()
 
 
 def _worldbook_direct_question(user_message: str) -> bool:
@@ -195,6 +220,7 @@ def build_prompt_package(
     bucket_worldbook_matches = _dep("bucket_worldbook_matches")
     normalize_worldbook_injection_role = _dep("normalize_worldbook_injection_role")
     build_preset_prompt = _dep("build_preset_prompt")
+    build_preset_output_guard = _optional_dep("build_preset_output_guard")
 
     persona = get_persona()
     history = get_conversation()
@@ -207,6 +233,7 @@ def build_prompt_package(
     worldbook_buckets = bucket_worldbook_matches(matched_worldbook_entries)
 
     preset_prompt = build_preset_prompt()
+    preset_prompt, marker_output_guard_prompt = _extract_runtime_guard_from_preset(preset_prompt)
     system_prompt = str(persona.get("system_prompt", "")).strip()
     memory_recap_prompt = build_memory_recap_prompt(memories)
     user_profile_prompt = build_user_profile_prompt(user_profile)
@@ -221,6 +248,8 @@ def build_prompt_package(
     worldbook_answer_guard = build_worldbook_answer_guard(user_message, matched_worldbook_entries)
     retrieval_prompt = build_retrieval_prompt(recalled_memories)
     sprite_prompt = build_sprite_prompt(llm_config)
+    dependency_output_guard_prompt = str(build_preset_output_guard()).strip() if build_preset_output_guard else ""
+    preset_output_guard_prompt = dependency_output_guard_prompt or marker_output_guard_prompt
 
     history_limit = max(1, int(llm_config["history_limit"]))
     recent_history = history[-history_limit:]
@@ -280,6 +309,9 @@ def build_prompt_package(
             messages.append({"role": role, "content": content})
 
     append_in_chat_bucket(0)
+
+    if preset_output_guard_prompt:
+        messages.append({"role": "system", "content": preset_output_guard_prompt})
 
     clean_user_message = str(user_message or "").strip()
     messages.append({"role": "user", "content": clean_user_message})
@@ -355,6 +387,12 @@ def build_prompt_package(
         "最近聊天记录",
         [recent_history_text],
         turn_count=len(recent_history),
+    )
+    append_layer(
+        "final_output_guard",
+        "本轮输出守卫（V4F）",
+        [preset_output_guard_prompt],
+        enabled=bool(preset_output_guard_prompt),
     )
     append_layer(
         "user_input",

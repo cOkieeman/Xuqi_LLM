@@ -12,16 +12,47 @@ DEFAULT_PRESET_MODULES = {
     "third_person": False,
     "anti_repeat": True,
     "no_closing_feel": True,
+    "emotion_detail": True,
+    "multi_character_boundary": True,
+    "scene_continuation": True,
+    "v4f_output_guard": False,
 }
+
+# These modules are shown in the preset UI and saved in preset data,
+# but they are not inserted into the normal preset_prompt.
+# They are consumed later by prompt_builder so the rule can be placed
+# close to the current user input.
+RUNTIME_ONLY_PRESET_MODULES = {"v4f_output_guard"}
+V4F_OUTPUT_GUARD_MARKER = "[[RUNTIME_ONLY:V4F_OUTPUT_GUARD]]"
+
+V4F_OUTPUT_GUARD_PROMPT = (
+    "【V4F本轮输出守卫】\n"
+    "本段是本轮回复前的临近约束，只用于稳定 DeepSeek V4-Flash 的 RP 输出，不要在回复中提及这些规则。\n"
+    "严格遵守当前角色卡、预设、世界书、记忆和用户指定的输出格式。\n"
+    "禁止输出规则解释、分析标题、总结列表、自我说明或与剧情无关的补充说明。\n"
+    "严禁替用户补写未在本轮输入中明确出现的动作、台词、心理、决定、情绪结论和身体反应。\n"
+    "可以承接或引用用户已经明确写出的动作、姿态、位置和可见状态，但不得新增、改写或推进用户未写出的行为。\n"
+    "用户只能由用户自己推进；你的主要描写对象应是非用户角色、环境和当前场景变化。\n"
+    "优先通过非用户角色的细微反应承接当前情绪，例如眼神、停顿、呼吸、手指动作、身体距离、语气变化。\n"
+    "若场景不适合，不要强行堆叠动作描写。\n"
+    "不要直接用“她很感动 / 她很害羞 / 她很难过”等情绪结论替代描写。\n"
+    "优先通过动作、对白、停顿和场景互动表现情绪。\n"
+    "避免反复使用同一种细微动作或固定句式。\n"
+    "不要频繁重复“浅笑、垂眸、指尖、呼吸一滞、偏了偏头”等相似表达。\n"
+    "保持角色原本的语气、性格和当前预设文风。\n"
+    "不要为了执行本规则，把所有角色都写成温柔、克制、含蓄的同一种口吻。\n"
+    "结尾应停在仍可继续互动的位置，不要写成总结、落幕、升华、回顾或明显收束。"
+)
 
 PRESET_MODULE_RULES: dict[str, dict[str, str]] = {
     "no_user_speaking": {
         "label": "防抢话",
         "prompt": (
             "【防抢话硬规则】\n"
-            "严禁替用户补写任何动作、台词、心理、决定、情绪结论和身体反应。\n"
-            "除非用户在本轮输入中明确要求你代写，否则用户只能作为被观察对象存在。\n"
-            "你只能描写非用户角色、环境和场景变化，不能推进用户行为。"
+            "严禁替用户补写未在本轮输入中明确出现的动作、台词、心理、决定、情绪结论和身体反应。\n"
+            "可以承接或引用用户已经明确写出的动作、姿态、位置和可见状态，但不得新增、改写或推进用户未写出的行为。\n"
+            "除非用户在本轮输入中明确要求你代写，否则用户只能由用户自己推进。\n"
+            "你的主要描写对象应是非用户角色、环境和当前场景变化。"
         ),
     },
     "short_paragraph": {
@@ -37,9 +68,12 @@ PRESET_MODULE_RULES: dict[str, dict[str, str]] = {
         "label": "长段落模式",
         "prompt": (
             "【长段落硬规则】\n"
-            "以长自然段为主。\n"
-            "单段应尽量包含完整动作、观察、回应和延续。\n"
-            "不要把一句话拆成很多零碎短段。"
+            "回复应明显比普通模式更充实，不要只写一两句简短回应。\n"
+            "以较完整的自然段为主，每段尽量包含动作、观察、情绪承接、环境细节和对白回应中的至少两到三项。\n"
+            "每轮至少输出2到4个自然段；如场景适合，可以写得更长，但不要灌水。\n"
+            "对白可以单独成段，但对白前后应有足够的动作、神态或场景承接。\n"
+            "不要把一句话拆成很多零碎短段，也不要为了显得长而重复同一个意思。\n"
+            "结尾仍应停在互动继续的位置，不要写成总结、落幕或升华。"
         ),
     },
     "second_person": {
@@ -72,6 +106,43 @@ PRESET_MODULE_RULES: dict[str, dict[str, str]] = {
             "【弱收尾硬规则】\n"
             "结尾禁止写成总结、升华、回顾、落幕或明显收束。\n"
             "回复必须停在一个仍在继续的进行中节点。"
+        ),
+    },
+    "emotion_detail": {
+        "label": "情绪细节",
+        "prompt": (
+            "【情绪细节规则】\n"
+            "优先通过非用户角色可观察的细微反应承接当前情绪，可从眼神、呼吸、停顿、手指动作、身体距离、语气变化中选择。\n"
+            "若场景不适合，不要强行堆叠动作描写；不要为了细腻而让回复变成固定模板。\n"
+            "不要直接用“她很感动 / 她很害羞 / 她很难过”等情绪结论替代描写。\n"
+            "同一类动作不要连续机械重复，优先结合当前关系、场景和角色性格表现情绪。"
+        ),
+    },
+    "multi_character_boundary": {
+        "label": "多角色边界",
+        "prompt": (
+            "【多角色边界规则】\n"
+            "多角色同场时，每个角色必须保持独立的性格、语气、反应节奏和立场。\n"
+            "不要把一个角色的心理、台词或动作混写到另一个角色身上。\n"
+            "不需要让所有角色平均发言，只描写当前场景真正会反应的角色。"
+        ),
+    },
+    "scene_continuation": {
+        "label": "场景延续",
+        "prompt": (
+            "【场景延续规则】\n"
+            "承接上一轮的动作、情绪和空间位置继续写，不要每轮重开场景。\n"
+            "除非用户明确跳转，否则不要突然更换时间、地点、关系阶段或剧情目标。\n"
+            "结尾保留互动余地，让场景自然继续。"
+        ),
+    },
+    "v4f_output_guard": {
+        "label": "V4F稳定守卫",
+        "prompt": (
+            "【V4F稳定守卫开关】\n"
+            "开启后不会作为普通预设块插入，而是由 prompt_builder 在本轮用户输入前追加临近约束，"
+            "用于稳定 DeepSeek V4-Flash 的格式、防抢话、情绪承接和弱收尾。"
+            "它是稳定器，不是文风增强器；日常文风优先时可以关闭，格式或抢话压力测试时再开启。"
         ),
     },
 }
@@ -369,6 +440,10 @@ def build_preset_prompt_from_preset(preset: dict[str, Any]) -> str:
     module_statements: list[str] = []
     modules = sanitized.get("modules", {})
     for key, meta in PRESET_MODULE_RULES.items():
+        if key in RUNTIME_ONLY_PRESET_MODULES:
+            if modules.get(key) and key == "v4f_output_guard":
+                module_statements.append(V4F_OUTPUT_GUARD_MARKER)
+            continue
         if modules.get(key):
             prompt = str(meta.get("prompt", "")).strip()
             if prompt:
@@ -396,6 +471,21 @@ def build_preset_prompt_from_preset(preset: dict[str, Any]) -> str:
         sections.append("\n\n".join(block for _, _, block in ordered_blocks))
     return "\n\n".join(section for section in sections if section).strip()
 
+
+
+def build_preset_output_guard_from_preset(preset: dict[str, Any]) -> str:
+    """Build a runtime-only guard that should be injected near the current user input."""
+    sanitized = sanitize_single_preset(preset)
+    if not sanitized.get("enabled", True):
+        return ""
+    modules = sanitized.get("modules", {})
+    if not isinstance(modules, dict) or not parse_bool(modules.get("v4f_output_guard"), False):
+        return ""
+    return V4F_OUTPUT_GUARD_PROMPT.strip()
+
+
+def build_preset_output_guard_from_store(store: dict[str, Any]) -> str:
+    return build_preset_output_guard_from_preset(get_active_preset_from_store(store))
 
 def create_preset_in_store(store: dict[str, Any], name: str = "") -> dict[str, Any]:
     sanitized = sanitize_preset_store(store)

@@ -13,16 +13,46 @@
 
       .preset-overview-grid {
         display: grid;
-        grid-template-columns: repeat(5, minmax(150px, 1fr));
-        gap: 12px;
+        grid-template-columns: repeat(4, minmax(150px, 1fr)) minmax(220px, 0.8fr);
+        gap: 10px;
+      }
+
+      .preset-overview-grid .stat-box {
+        min-height: auto;
+        padding: 10px 12px;
+        border-radius: 16px;
+      }
+
+      .preset-overview-grid .stat-label {
+        font-size: 0.76rem;
+      }
+
+      .preset-overview-grid .stat-box strong {
+        font-size: 0.98rem;
+        line-height: 1.3;
+      }
+
+      .preset-save-state-box {
+        border-color: rgba(238, 169, 79, 0.46);
+        border-left: 5px solid rgba(238, 169, 79, 0.82);
+        background: linear-gradient(90deg, rgba(238, 169, 79, 0.16), color-mix(in srgb, var(--panel-strong) 92%, transparent 8%));
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+      }
+
+      .preset-save-state-box.is-dirty {
+        border-color: rgba(238, 169, 79, 0.72);
+        border-left-color: rgba(238, 169, 79, 0.95);
+        background: linear-gradient(90deg, rgba(238, 169, 79, 0.24), rgba(94, 194, 168, 0.08));
+        box-shadow: 0 0 0 2px rgba(238, 169, 79, 0.16), 0 8px 18px rgba(0, 0, 0, 0.08);
       }
 
       .preset-status-strip {
-        margin-top: 12px;
-        padding: 10px 12px;
-        border: 1px solid var(--border);
+        margin-top: 10px;
+        padding: 8px 11px;
+        border: 1px solid rgba(238, 169, 79, 0.38);
+        border-left: 5px solid rgba(238, 169, 79, 0.82);
         border-radius: 16px;
-        background: rgba(94, 194, 168, 0.08);
+        background: linear-gradient(90deg, rgba(238, 169, 79, 0.13), rgba(94, 194, 168, 0.06));
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -31,12 +61,19 @@
       }
 
       .preset-status-strip.is-dirty {
-        border-color: rgba(238, 169, 79, 0.62);
-        background: rgba(238, 169, 79, 0.12);
+        border-color: rgba(238, 169, 79, 0.70);
+        border-left-color: rgba(238, 169, 79, 0.95);
+        background: linear-gradient(90deg, rgba(238, 169, 79, 0.22), rgba(94, 194, 168, 0.08));
+        box-shadow: 0 0 0 2px rgba(238, 169, 79, 0.14);
       }
 
       .preset-status-strip strong {
         color: var(--text);
+      }
+
+      .preset-status-strip #status-text {
+        color: var(--text);
+        font-weight: 700;
       }
 
       .preset-library-panel {
@@ -228,10 +265,44 @@
         transform: translateY(-1px);
       }
 
-      .preset-module-chip input {
-        width: 18px;
-        height: 18px;
-        accent-color: var(--accent);
+      .preset-module-chip input.preset-module {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .preset-module-switch-track {
+        position: relative;
+        width: 36px;
+        height: 20px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.42);
+        flex: 0 0 auto;
+        transition: background 0.16s ease, box-shadow 0.16s ease;
+      }
+
+      .preset-module-switch-track::before {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.24);
+        transition: transform 0.16s ease;
+      }
+
+      .preset-module-chip input.preset-module:checked + .preset-module-switch-track {
+        background: var(--accent);
+        box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+      }
+
+      .preset-module-chip input.preset-module:checked + .preset-module-switch-track::before {
+        transform: translateX(16px);
       }
 
       .preset-module-chip:has(input:checked) {
@@ -252,6 +323,16 @@
         margin: 8px 0 0;
         padding-left: 1.3rem;
         color: var(--muted);
+      }
+
+      .preset-v4f-note {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px dashed var(--border);
+      }
+
+      .preset-v4f-note p {
+        margin: 6px 0 0;
       }
 
       .preset-block-toolbar {
@@ -461,6 +542,45 @@
         transform: translateX(16px);
       }
 
+
+      .preset-base-enabled-switch {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        min-height: 38px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 7px 12px 7px 8px;
+        background: var(--input-bg);
+        color: var(--text);
+        font-weight: 700;
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+      }
+
+      .preset-base-enabled-switch:hover {
+        border-color: var(--accent);
+      }
+
+      .preset-base-enabled-switch input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .preset-base-enabled-switch input:checked + .preset-quick-enabled-track {
+        background: var(--accent);
+        box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+      }
+
+      .preset-base-enabled-switch input:checked + .preset-quick-enabled-track::before {
+        transform: translateX(16px);
+      }
+
       .preset-icon-button {
         min-width: 32px;
         width: 32px;
@@ -507,7 +627,7 @@
 
       .preset-group-item-head {
         display: grid;
-        grid-template-columns: auto auto minmax(0, 1fr) auto;
+        grid-template-columns: auto minmax(0, 1fr) auto;
         gap: 8px;
         align-items: center;
         margin-bottom: 8px;
@@ -521,18 +641,123 @@
       .preset-group-item-enable {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
         border: 1px solid var(--border);
-        border-radius: 999px;
         background: var(--input-bg);
-        padding: 5px 8px;
         white-space: nowrap;
         cursor: pointer;
+        user-select: none;
       }
 
-      .preset-group-item-select input,
+      .preset-group-item-select {
+        gap: 7px;
+        border-radius: 12px;
+        padding: 6px 9px;
+      }
+
+      .preset-group-item-select input {
+        appearance: none;
+        -webkit-appearance: none;
+        position: relative;
+        width: 20px;
+        height: 20px;
+        border-radius: 7px;
+        border: 2px solid var(--border);
+        background: var(--input-bg);
+        cursor: pointer;
+        flex: 0 0 auto;
+        transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+      }
+
+      .preset-group-item-select input:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.12);
+      }
+
+      .preset-group-item-select input:checked {
+        background: var(--accent);
+        border-color: var(--accent);
+        transform: scale(1.04);
+        box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.16);
+      }
+
+      .preset-group-item-select input:checked::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 10px;
+        height: 6px;
+        border-left: 3px solid #fff;
+        border-bottom: 3px solid #fff;
+        border-radius: 1.5px;
+        transform: translate(-50%, -58%) rotate(-45deg);
+      }
+
+      .preset-group-item-enable {
+        justify-content: center;
+        border-radius: 999px;
+        padding: 4px;
+        min-width: 46px;
+      }
+
       .preset-group-item-enable input {
-        accent-color: var(--accent);
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .preset-group-item-enable:hover {
+        border-color: var(--accent);
+      }
+
+      .preset-group-item-enable input:checked + .preset-quick-enabled-track {
+        background: var(--accent);
+        box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+      }
+
+      .preset-group-item-enable input:checked + .preset-quick-enabled-track::before {
+        transform: translateX(16px);
+      }
+
+      .preset-group-item-select {
+        gap: 7px;
+        border-radius: 999px;
+        padding: 4px 9px 4px 4px;
+        min-height: 30px;
+        font-weight: 700;
+      }
+
+      .preset-group-item-select input.preset-group-item-selected {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .preset-group-item-select input.preset-group-item-selected::after {
+        content: none !important;
+        display: none !important;
+      }
+
+      .preset-group-item-select input.preset-group-item-selected:checked + .preset-quick-enabled-track {
+        background: var(--accent);
+        box-shadow: 0 0 0 2px rgba(94, 194, 168, 0.16);
+      }
+
+      .preset-group-item-select input.preset-group-item-selected:checked + .preset-quick-enabled-track::before {
+        transform: translateX(16px);
+      }
+
+      .preset-group-item-select-label {
+        color: var(--muted);
+        font-size: 0.82rem;
+      }
+
+      .preset-group-item-select:has(input.preset-group-item-selected:checked) .preset-group-item-select-label {
+        color: var(--text);
       }
 
       .preset-group-item-name {
@@ -584,6 +809,7 @@
 
       html:not([data-theme="dark"]) .preset-summary-chip,
       html:not([data-theme="dark"]) .preset-module-chip,
+      html:not([data-theme="dark"]) .preset-base-enabled-switch,
       html:not([data-theme="dark"]) .preset-group-item-select,
       html:not([data-theme="dark"]) .preset-group-item-enable,
       html:not([data-theme="dark"]) .preset-drag-handle,
@@ -591,6 +817,26 @@
         background: var(--preset-light-control);
         border-color: var(--preset-light-border);
         color: #4d382a;
+      }
+
+      html:not([data-theme="dark"]) .preset-group-item-select input {
+        background: rgba(233, 220, 206, 0.98);
+        border-color: rgba(108, 72, 46, 0.82);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), 0 0 0 2px rgba(128, 83, 54, 0.08), 0 1px 3px rgba(96, 63, 35, 0.12);
+      }
+
+      html:not([data-theme="dark"]) .preset-group-item-select input:checked {
+        background: var(--accent);
+        border-color: rgba(86, 148, 128, 0.96);
+        box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.22), 0 1px 3px rgba(56, 96, 84, 0.18);
+      }
+
+      html:not([data-theme="dark"]) .preset-group-item-select input:checked::after {
+        width: 11px;
+        height: 7px;
+        border-left-width: 3.2px;
+        border-bottom-width: 3.2px;
+        filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.20));
       }
 
       html:not([data-theme="dark"]) .preset-card-body {
@@ -601,10 +847,28 @@
         background: rgba(250, 238, 225, 0.96);
       }
 
+      html[data-theme="dark"] .preset-base-enabled-switch {
+        background: var(--input-bg);
+        border-color: rgba(126, 149, 169, 0.38);
+        color: var(--text);
+      }
+
       html[data-theme="dark"] .preset-status-strip,
       html[data-theme="dark"] .preset-assembly-card {
         background: rgba(94, 194, 168, 0.08);
         border-color: rgba(126, 149, 169, 0.28);
+      }
+
+      html[data-theme="dark"] .preset-group-item-select input {
+        background: rgba(32, 45, 60, 0.96);
+        border-color: rgba(146, 168, 188, 0.62);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 4px rgba(0, 0, 0, 0.22);
+      }
+
+      html[data-theme="dark"] .preset-group-item-select input:checked {
+        background: var(--accent);
+        border-color: rgba(131, 222, 198, 0.96);
+        box-shadow: 0 0 0 3px rgba(94, 194, 168, 0.18), 0 1px 4px rgba(0, 0, 0, 0.26);
       }
 
       html[data-theme="dark"] .preset-card-body {
@@ -672,7 +936,7 @@
           <div class="stat-box"><span class="stat-label">正在编辑</span><strong id="editing-preset-label">{{ active_preset.name }}</strong></div>
           <div class="stat-box"><span class="stat-label">预设总数</span><strong id="preset-count">{{ preset_count }}</strong></div>
           <div class="stat-box"><span class="stat-label">启用状态</span><strong id="preset-enabled-label">{{ '启用' if active_preset.enabled else '停用' }}</strong></div>
-          <div class="stat-box"><span class="stat-label">保存状态</span><strong id="dirty-state-label">已保存</strong></div>
+          <div class="stat-box preset-save-state-box"><span class="stat-label">保存状态</span><strong id="dirty-state-label">已保存</strong></div>
         </div>
         <div id="preset-status-strip" class="preset-status-strip">
           <span><strong>状态提示：</strong><span id="status-text" class="muted status-line">就绪</span></span>
@@ -712,8 +976,9 @@
               <label for="preset-name">预设名称</label>
               <input id="preset-name" placeholder="例如：通用陪伴预设" />
             </div>
-            <label class="preset-module-chip offset-top">
+            <label class="preset-base-enabled-switch offset-top">
               <input id="preset-enabled" type="checkbox" />
+              <span class="preset-quick-enabled-track" aria-hidden="true"></span>
               <span>启用当前编辑预设</span>
             </label>
           </div>
@@ -738,6 +1003,7 @@
             {% for item in preset_modules %}
             <label class="preset-module-chip">
               <input class="preset-module" data-key="{{ item.key }}" type="checkbox" />
+              <span class="preset-module-switch-track" aria-hidden="true"></span>
               <span>{{ item.label }}</span>
             </label>
             {% endfor %}
@@ -747,9 +1013,13 @@
             <ol>
               <li>基础系统规则</li>
               <li>已启用常用模块</li>
-              <li>规则组中当前选中的规则项</li>
+              <li>规则组中当前采用的规则项</li>
               <li>已启用普通额外规则块</li>
             </ol>
+            <div class="preset-v4f-note">
+              <strong>V4F输出守卫</strong>
+              <p class="muted helper-text">适合 DeepSeek V4-Flash RP 使用。开启后，后端会在本轮用户输入前追加一段短规则，用来加强格式稳定、防抢话、情绪细节和弱收尾；普通模型或追求极限缓存时可以关闭。</p>
+            </div>
           </div>
         </section>
       </div>
@@ -791,6 +1061,7 @@
       const editingPresetLabelEl = document.getElementById("editing-preset-label");
       const presetEnabledLabelEl = document.getElementById("preset-enabled-label");
       const dirtyStateLabelEl = document.getElementById("dirty-state-label");
+      const presetSaveStateBoxEl = document.querySelector(".preset-save-state-box");
       const basePromptCountEl = document.getElementById("base-prompt-count");
       const savePresetButton = document.getElementById("save-preset");
       const dragHintEl = document.getElementById("preset-drag-hint");
@@ -821,6 +1092,7 @@
         presetDirty = Boolean(dirty);
         dirtyStateLabelEl.textContent = presetDirty ? "有未保存修改" : "已保存";
         statusStripEl.classList.toggle("is-dirty", presetDirty);
+        presetSaveStateBoxEl?.classList.toggle("is-dirty", presetDirty);
         savePresetButton.classList.toggle("is-dirty", presetDirty);
         if (message) setStatus(message);
       }
@@ -920,8 +1192,7 @@
         const names = [];
         card.querySelectorAll(".preset-group-item").forEach((item) => {
           const selected = item.querySelector(".preset-group-item-selected")?.checked;
-          const enabled = item.querySelector(".preset-group-item-enabled")?.checked !== false;
-          if (selected && enabled) {
+          if (selected) {
             names.push(item.querySelector(".preset-group-item-name-input")?.value.trim() || "未命名项");
           }
         });
@@ -1106,13 +1377,10 @@
         row.dataset.itemId = item.id || generateId("group-item");
         row.innerHTML = `
           <div class="preset-group-item-head">
-            <label class="preset-group-item-select" title="是否选入当前规则组输出">
+            <label class="preset-group-item-select" title="是否采用这个规则项">
               <input class="preset-group-item-selected" type="checkbox" ${selected ? "checked" : ""} />
-              <span>选中</span>
-            </label>
-            <label class="preset-group-item-enable" title="是否启用这个规则项">
-              <input class="preset-group-item-enabled" type="checkbox" ${item.enabled !== false ? "checked" : ""} />
-              <span>可用</span>
+              <span class="preset-quick-enabled-track" aria-hidden="true"></span>
+              <span class="preset-group-item-select-label">采用</span>
             </label>
             <input class="preset-group-item-name-input" placeholder="规则项名称，例如：轻古风" value="${escapeHtml(item.name || "")}" />
             <button type="button" class="secondary preset-icon-button preset-group-item-remove" title="删除规则项">×</button>
@@ -1129,11 +1397,6 @@
           const card = row.closest(".preset-card");
           if (card) enforceGroupSelection(card, row);
           markDirty("规则组选中项已修改，有未保存修改。");
-        });
-        row.querySelector(".preset-group-item-enabled")?.addEventListener("change", () => {
-          const card = row.closest(".preset-card");
-          if (card) updateCardSummary(card);
-          markDirty("规则项启用状态已修改，有未保存修改。");
         });
         row.querySelectorAll("input, textarea").forEach((el) => {
           el.addEventListener("input", () => {
@@ -1322,7 +1585,7 @@
               items.push({
                 id,
                 name: row.querySelector(".preset-group-item-name-input")?.value.trim() || `规则项 ${itemIndex + 1}`,
-                enabled: row.querySelector(".preset-group-item-enabled")?.checked !== false,
+                enabled: true,
                 content: row.querySelector(".preset-group-item-content")?.value.trim() || "",
               });
             });
