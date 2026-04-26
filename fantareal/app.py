@@ -2394,6 +2394,11 @@ def _normalize_worldbook_injection_order(value: Any, default: int = 100) -> int:
     return clamp_int(value, 0, 999999, default)
 
 
+def _normalize_worldbook_prompt_layer(value: Any, default: str = "follow_position") -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"follow_position", "stable", "current_state", "dynamic", "output_guard"} else default
+
+
 def _worldbook_position_priority(item: dict[str, Any]) -> int:
     position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
     if position == "in_chat":
@@ -2423,11 +2428,20 @@ def _worldbook_bucket_sort_key(item: dict[str, Any]) -> tuple[int, int, str]:
 
 def bucket_worldbook_matches(matches: list[dict[str, Any]] | None) -> dict[str, Any]:
     buckets: dict[str, Any] = {
+        "stable": [],
+        "current_state": [],
+        "dynamic": [],
+        "output_guard": [],
         "before_char_defs": [],
         "after_char_defs": [],
         "in_chat": {},
     }
     for item in matches or []:
+        prompt_layer = _normalize_worldbook_prompt_layer(item.get("prompt_layer", "follow_position"), "follow_position")
+        if prompt_layer in {"stable", "current_state", "dynamic", "output_guard"}:
+            buckets[prompt_layer].append(item)
+            continue
+
         position = _normalize_worldbook_insertion_position(item.get("insertion_position", "after_char_defs"), "after_char_defs")
         if position == "in_chat":
             depth = _normalize_worldbook_injection_depth(item.get("injection_depth", 0), 0)
@@ -2437,8 +2451,8 @@ def bucket_worldbook_matches(matches: list[dict[str, Any]] | None) -> dict[str, 
         else:
             buckets["after_char_defs"].append(item)
 
-    buckets["before_char_defs"].sort(key=_worldbook_bucket_sort_key)
-    buckets["after_char_defs"].sort(key=_worldbook_bucket_sort_key)
+    for key in ("stable", "current_state", "dynamic", "output_guard", "before_char_defs", "after_char_defs"):
+        buckets[key].sort(key=_worldbook_bucket_sort_key)
     for depth, items in list(buckets["in_chat"].items()):
         items.sort(key=_worldbook_bucket_sort_key)
         buckets["in_chat"][depth] = items
@@ -2477,6 +2491,7 @@ def _build_worldbook_runtime_debug_entries(
                     item.get("injection_order", item.get("order", item.get("priority", 100))),
                     100,
                 ),
+                "prompt_layer": _normalize_worldbook_prompt_layer(item.get("prompt_layer", "follow_position"), "follow_position"),
                 "recursive_enabled": bool(item.get("recursive_enabled", True)),
                 "prevent_further_recursion": bool(item.get("prevent_further_recursion", False)),
                 "chance": clamp_int(item.get("chance", 100), 0, 100, 100),
@@ -2600,6 +2615,7 @@ def _worldbook_match_payload(
         "injection_depth": injection_depth,
         "injection_role": injection_role,
         "injection_order": injection_order,
+        "prompt_layer": _normalize_worldbook_prompt_layer(item.get("prompt_layer", "follow_position"), "follow_position"),
         "recursive_enabled": bool(item.get("recursive_enabled", True)),
         "prevent_further_recursion": bool(item.get("prevent_further_recursion", False)),
         "matched_depth": clamp_int(matched_depth, 0, 5, 0),
@@ -3237,18 +3253,19 @@ def build_worldbook_debug_payload(
     buckets = bucket_worldbook_matches(selected_snapshot or worldbook_matches)
 
     prompt_blocks: list[str] = []
-    before_prompt = build_worldbook_prompt(
-        buckets["before_char_defs"],
-        heading="[before_char_defs] The following worldbook notes must be considered before the character definition.",
-    )
-    after_prompt = build_worldbook_prompt(
-        buckets["after_char_defs"],
-        heading="[after_char_defs] The following worldbook notes refine or extend the character definition for this turn.",
-    )
-    if before_prompt:
-        prompt_blocks.append(before_prompt)
-    if after_prompt:
-        prompt_blocks.append(after_prompt)
+    named_bucket_prompts = [
+        ("stable", "[stable] The following are stable worldbook notes for durable setting and character grounding."),
+        ("current_state", "[current_state] The following worldbook notes describe the current chapter, location, relationship, or temporary state."),
+        ("before_char_defs", "[before_char_defs] The following worldbook notes must be considered before the character definition."),
+        ("after_char_defs", "[after_char_defs] The following worldbook notes refine or extend the character definition for this turn."),
+        ("dynamic", "[dynamic] The following worldbook notes are temporary turn-level hints for the current message."),
+        ("output_guard", "[output_guard] The following worldbook notes are output-format or final-response rules for this turn."),
+    ]
+    for key, heading in named_bucket_prompts:
+        bucket_prompt = build_worldbook_prompt(buckets.get(key, []), heading=heading)
+        if bucket_prompt:
+            prompt_blocks.append(bucket_prompt)
+
     for depth in sorted(buckets.get("in_chat", {})):
         bucket_prompt = build_worldbook_prompt(
             buckets["in_chat"][depth],

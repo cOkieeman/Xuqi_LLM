@@ -135,6 +135,9 @@ class WorldbookEntryPayload(BaseModel):
     injection_role: str = "system"
     injection_order: int = 100
 
+    # RP 提示层级：follow_position / stable / current_state / dynamic / output_guard
+    prompt_layer: str = "follow_position"
+
     # 递归 V1
     recursive_enabled: bool = True
     prevent_further_recursion: bool = False
@@ -161,6 +164,9 @@ class WorldbookSettingsPayload(BaseModel):
     default_injection_depth: int = 0
     default_injection_role: str = "system"
     default_injection_order: int = 100
+
+    # RP 提示层级默认值
+    default_prompt_layer: str = "follow_position"
 
     # 递归 V1
     recursive_scan_enabled: bool = False
