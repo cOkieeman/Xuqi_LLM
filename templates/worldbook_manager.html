@@ -1469,12 +1469,43 @@
         gap: 8px;
       }
 
+      .worldbook-entry-body .wb-trigger-rule-grid {
+        grid-template-columns: minmax(138px, 0.9fr) minmax(150px, 1fr) minmax(138px, 0.9fr) minmax(138px, 0.9fr) minmax(138px, 0.9fr);
+      }
+
       .worldbook-entry-body .wb-number-grid {
         grid-template-columns: repeat(4, minmax(82px, 1fr));
       }
 
       .worldbook-entry-body .wb-injection-grid {
         grid-template-columns: minmax(150px, 1.2fr) minmax(96px, 0.85fr) minmax(88px, 0.72fr) minmax(88px, 0.72fr);
+        transition: opacity 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+      }
+
+      .worldbook-entry-body .wb-layer-override-note {
+        display: none;
+        grid-column: 1 / -1;
+        margin: 0 0 2px;
+        padding: 8px 10px;
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--input-bg) 82%, transparent 18%);
+        color: var(--muted);
+        font-size: 0.8rem;
+        line-height: 1.45;
+      }
+
+      .worldbook-entry-body .wb-injection-grid.is-layer-overridden {
+        opacity: 0.72;
+      }
+
+      .worldbook-entry-body .wb-injection-grid.is-layer-overridden .wb-layer-override-note {
+        display: block;
+      }
+
+      .worldbook-entry-body .wb-injection-grid.is-layer-overridden input,
+      .worldbook-entry-body .wb-injection-grid.is-layer-overridden select {
+        cursor: not-allowed;
       }
 
       .worldbook-entry-body .wb-compact-grid::before,
@@ -1915,6 +1946,16 @@
                   </select>
                 </div>
                 <div>
+                  <label>提示层级</label>
+                  <select class="wb-prompt-layer">
+                    <option value="follow_position" {% if (item.prompt_layer or 'follow_position') == 'follow_position' %}selected{% endif %}>跟随注入位置</option>
+                    <option value="stable" {% if item.prompt_layer == 'stable' %}selected{% endif %}>稳定区</option>
+                    <option value="current_state" {% if item.prompt_layer == 'current_state' %}selected{% endif %}>当前状态区</option>
+                    <option value="dynamic" {% if item.prompt_layer == 'dynamic' %}selected{% endif %}>动态区</option>
+                    <option value="output_guard" {% if item.prompt_layer == 'output_guard' %}selected{% endif %}>输出协议区</option>
+                  </select>
+                </div>
+                <div>
                   <label>主副关系</label>
                   <select class="wb-group-operator">
                     <option value="and" {% if (item.group_operator or 'and') == 'and' %}selected{% endif %}>与所有</option>
@@ -1957,6 +1998,7 @@
               </div>
 
               <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
+                <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
                 <div>
                   <label>插入位置</label>
                   <select class="wb-insertion-position">
@@ -2064,6 +2106,16 @@
               </select>
             </div>
             <div>
+              <label>提示层级</label>
+              <select class="wb-prompt-layer">
+                <option value="follow_position" selected>跟随注入位置</option>
+                <option value="stable">稳定区</option>
+                <option value="current_state">当前状态区</option>
+                <option value="dynamic">动态区</option>
+                <option value="output_guard">输出协议区</option>
+              </select>
+            </div>
+            <div>
               <label>主副关系</label>
               <select class="wb-group-operator">
                 <option value="and" selected>与所有</option>
@@ -2106,6 +2158,7 @@
           </div>
 
           <div class="grid-two wb-compact-grid wb-injection-grid" data-section-title="注入设置">
+            <p class="wb-layer-override-note">当前由提示层级接管，本条不会按插入位置注入；原注入位置会保留，切回“跟随注入位置”后继续生效。</p>
             <div>
               <label>插入位置</label>
               <select class="wb-insertion-position">
@@ -2198,6 +2251,10 @@
         { key: "disabled", label: "禁用" },
         { key: "constant", label: "常驻" },
         { key: "keyword", label: "关键词" },
+        { key: "stable", label: "稳定区" },
+        { key: "current_state", label: "当前状态" },
+        { key: "dynamic", label: "动态区" },
+        { key: "output_guard", label: "输出协议" },
         { key: "in_chat", label: "聊天注入" },
         { key: "before_char_defs", label: "角色前" },
         { key: "after_char_defs", label: "角色后" },
@@ -2207,6 +2264,29 @@
       let activeQuickFilter = "__all__";
       let activeHealthIssue = "";
       let worldbookDirty = false;
+
+      const PROMPT_LAYER_LABELS = {
+        follow_position: "跟随位置",
+        stable: "稳定区",
+        current_state: "当前状态",
+        dynamic: "动态区",
+        output_guard: "输出协议",
+      };
+
+      const PROMPT_LAYER_HINTS = {
+        stable: "提示层级已接管：进入稳定区，原注入位置仅保留。",
+        current_state: "提示层级已接管：进入当前状态区，原注入位置仅保留。",
+        dynamic: "提示层级已接管：进入动态区，原注入位置仅保留。",
+        output_guard: "提示层级已接管：进入输出协议区，原注入位置仅保留。",
+      };
+
+      function getPromptLayerLabel(value) {
+        return PROMPT_LAYER_LABELS[value] || PROMPT_LAYER_LABELS.follow_position;
+      }
+
+      function getPromptLayerHint(value) {
+        return PROMPT_LAYER_HINTS[value] || "跟随注入位置：继续按角色前/角色后/聊天注入生效。";
+      }
 
       function setStatus(text) {
         statusEl.textContent = worldbookDirty ? `${text}（有未保存修改）` : text;
@@ -2423,11 +2503,13 @@
       function matchesQuickFilter(card) {
         if (activeQuickFilter === "__all__") return true;
         const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
+        const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
         const insertionPosition = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
         if (activeQuickFilter === "enabled") return card.querySelector(".wb-enabled")?.checked !== false;
         if (activeQuickFilter === "disabled") return card.querySelector(".wb-enabled")?.checked === false;
         if (activeQuickFilter === "constant") return entryType === "constant";
         if (activeQuickFilter === "keyword") return entryType === "keyword";
+        if (["stable", "current_state", "dynamic", "output_guard"].includes(activeQuickFilter)) return promptLayer === activeQuickFilter;
         if (activeQuickFilter === "in_chat") return insertionPosition === "in_chat";
         if (activeQuickFilter === "before_char_defs") return insertionPosition === "before_char_defs";
         if (activeQuickFilter === "after_char_defs") return insertionPosition === "after_char_defs";
@@ -2448,6 +2530,8 @@
           card.querySelector(".wb-trigger")?.value || "",
           card.querySelector(".wb-secondary-trigger")?.value || "",
           card.querySelector(".wb-entry-type")?.value || "",
+          card.querySelector(".wb-prompt-layer")?.value || "",
+          getPromptLayerLabel(card.querySelector(".wb-prompt-layer")?.value || "follow_position"),
           card.querySelector(".wb-insertion-position")?.value || "",
           card.querySelector(".wb-injection-role")?.value || "",
           card.querySelector(".wb-content")?.value || "",
@@ -2499,9 +2583,29 @@
 
       function syncInjectionUi(card) {
         if (!card) return;
+        const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
+        const layerOverridden = promptLayer !== "follow_position";
         const position = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
+        const injectionGrid = card.querySelector(".wb-injection-grid");
+        const layerNote = card.querySelector(".wb-layer-override-note");
+        injectionGrid?.classList.toggle("is-layer-overridden", layerOverridden);
+        if (layerNote) layerNote.textContent = layerOverridden
+          ? getPromptLayerHint(promptLayer)
+          : "跟随注入位置：继续按角色前/角色后/聊天注入生效。";
+
+        const injectionControls = [
+          card.querySelector(".wb-insertion-position"),
+          card.querySelector(".wb-injection-order"),
+          card.querySelector(".wb-injection-depth"),
+          card.querySelector(".wb-injection-role"),
+        ].filter(Boolean);
+        injectionControls.forEach((control) => {
+          control.disabled = layerOverridden;
+          control.title = layerOverridden ? getPromptLayerHint(promptLayer) : "";
+        });
+
         const depthInput = card.querySelector(".wb-injection-depth");
-        if (depthInput) {
+        if (depthInput && !layerOverridden) {
           const disabled = position !== "in_chat";
           depthInput.disabled = disabled;
           depthInput.title = disabled ? "仅在“聊天内注入”时生效" : "";
@@ -2696,6 +2800,7 @@
         summary.innerHTML = "";
 
         const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
+        const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
         const insertionPosition = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
         const depth = Number(card.querySelector(".wb-injection-depth")?.value || 0);
         const order = Number(card.querySelector(".wb-order")?.value || 100);
@@ -2703,12 +2808,18 @@
         const chance = Number(card.querySelector(".wb-chance")?.value || 100);
 
         summary.appendChild(createSummaryChip(getEntryTypeLabel(entryType), "strong"));
-        summary.appendChild(createSummaryChip(
-          insertionPosition === "in_chat"
-            ? `聊天注入 depth ${depth}`
-            : getInsertionPositionLabel(insertionPosition),
-          "strong"
-        ));
+        if (promptLayer === "follow_position") {
+          summary.appendChild(createSummaryChip("跟随位置"));
+          summary.appendChild(createSummaryChip(
+            insertionPosition === "in_chat"
+              ? `聊天注入 depth ${depth}`
+              : getInsertionPositionLabel(insertionPosition),
+            "strong"
+          ));
+        } else {
+          summary.appendChild(createSummaryChip(`${getPromptLayerLabel(promptLayer)}优先`, "strong"));
+          summary.appendChild(createSummaryChip(`原位置:${getInsertionPositionLabel(insertionPosition)}`));
+        }
         summary.appendChild(createSummaryChip(`顺序 ${order}`));
         summary.appendChild(createSummaryChip(`注入 ${injectionOrder}`));
         summary.appendChild(createSummaryChip(`概率 ${chance}%`, chance <= 0 ? "warning" : ""));
@@ -2730,6 +2841,10 @@
           { key: "ungrouped", label: "未分组词条", description: "组别为空，长世界书中较难定位。" },
           { key: "disabled", label: "禁用词条", description: "当前不会参与触发。" },
           { key: "constant", label: "常驻词条", description: "常驻词条过多可能挤占上下文。" },
+          { key: "stable", label: "稳定区词条", description: "固定设定、常驻世界观或长期人设补充。" },
+          { key: "current_state", label: "当前状态区词条", description: "章节、地点、关系或临时状态提示。" },
+          { key: "dynamic", label: "动态区词条", description: "本轮临时提示或非聊天深度的动态世界书。" },
+          { key: "output_guard", label: "输出协议区词条", description: "状态变量、TTS 或格式约束类规则。" },
           { key: "in_chat", label: "聊天内注入词条", description: "检查聊天深度和注入顺序是否符合预期。" },
           { key: "chance_zero", label: "概率为 0 的词条", description: "概率为 0 时基本不会触发。" },
           { key: "duplicate_title", label: "重复标题", description: "多个词条使用了同一个标题。" },
@@ -2770,6 +2885,7 @@
           const trigger = getNormalizedTrigger(card);
           const content = getTrimmedValue(card, ".wb-content");
           const entryType = card.querySelector(".wb-entry-type")?.value || "keyword";
+          const promptLayer = card.querySelector(".wb-prompt-layer")?.value || "follow_position";
           const groupKey = getCardGroupKey(card);
           const enabled = card.querySelector(".wb-enabled")?.checked !== false;
           const insertionPosition = card.querySelector(".wb-insertion-position")?.value || "after_char_defs";
@@ -2781,6 +2897,7 @@
           if (groupKey === "__ungrouped__") addIssue(card, "ungrouped");
           if (!enabled) addIssue(card, "disabled");
           if (entryType === "constant") addIssue(card, "constant");
+          if (promptLayer !== "follow_position") addIssue(card, promptLayer);
           if (insertionPosition === "in_chat") addIssue(card, "in_chat");
           if (chance <= 0) addIssue(card, "chance_zero");
           if (title && (titleMap.get(title) || 0) > 1) addIssue(card, "duplicate_title");
@@ -2871,6 +2988,7 @@
         card.querySelector(".wb-content").value = item.content || "";
         card.querySelector(".wb-comment").value = item.comment || "";
         card.querySelector(".wb-entry-type").value = item.entry_type || "keyword";
+        card.querySelector(".wb-prompt-layer").value = item.prompt_layer || "follow_position";
         card.querySelector(".wb-group-operator").value = item.group_operator || "and";
         card.querySelector(".wb-match-mode").value = item.match_mode || "any";
         card.querySelector(".wb-secondary-mode").value = item.secondary_mode || "all";
@@ -2904,6 +3022,7 @@
             trigger: card.querySelector(".wb-trigger").value.trim(),
             secondary_trigger: card.querySelector(".wb-secondary-trigger").value.trim(),
             entry_type: card.querySelector(".wb-entry-type").value,
+            prompt_layer: card.querySelector(".wb-prompt-layer").value,
             group_operator: card.querySelector(".wb-group-operator").value,
             match_mode: card.querySelector(".wb-match-mode").value,
             secondary_mode: card.querySelector(".wb-secondary-mode").value,
@@ -3137,7 +3256,7 @@
       worldbookListEl.addEventListener("input", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
-        if (event.target.classList.contains("wb-insertion-position")) {
+        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
           syncInjectionUi(card);
         }
         updateCardTitle(card);
@@ -3155,8 +3274,10 @@
       worldbookListEl.addEventListener("change", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
-        if (event.target.classList.contains("wb-insertion-position")) {
+        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
           syncInjectionUi(card);
+          updateCardTitle(card);
+          applyWorldbookSearch();
         }
       });
 
@@ -3312,8 +3433,10 @@
       worldbookListEl.addEventListener("change", (event) => {
         const card = event.target.closest(".worldbook-entry-card");
         if (!card) return;
-        if (event.target.classList.contains("wb-insertion-position")) {
+        if (event.target.classList.contains("wb-insertion-position") || event.target.classList.contains("wb-prompt-layer")) {
           syncInjectionUi(card);
+          updateCardTitle(card);
+          applyWorldbookSearch();
         }
         if (event.target.classList.contains("wb-selected")) {
           updateSelectedCount();

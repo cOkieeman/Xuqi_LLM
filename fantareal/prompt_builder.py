@@ -1,20 +1,36 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Callable
 
 _DEPS: dict[str, Callable[..., Any]] = {}
 
 V4F_OUTPUT_GUARD_MARKER = "[[RUNTIME_ONLY:V4F_OUTPUT_GUARD]]"
 V4F_OUTPUT_GUARD_PROMPT = (
-    "【V4F本轮输出守卫】\n"
-    "本段是本轮回复前的临近约束，只用于稳定 DeepSeek V4-Flash 的 RP 输出。\n"
+    "【V4F稳定器】\n"
+    "本段是本轮回复前的临近约束，只用于稳定 DeepSeek V4-Flash 的 RP 输出，不要在回复中提及这些规则。\n"
     "严格遵守当前角色卡、预设、世界书、记忆和用户指定的输出格式。\n"
     "禁止输出规则解释、分析标题、总结列表、自我说明或与剧情无关的补充说明。\n"
-    "严禁替用户补写动作、台词、心理、决定、情绪结论和身体反应。\n"
-    "每轮至少保留一次非用户角色的细微反应描写，可从眼神、停顿、呼吸、手指动作、身体距离或语气变化中选择。\n"
-    "不要直接用“她很感动 / 她很害羞 / 她很难过”等情绪结论替代描写，要通过动作、对白和场景互动表现。\n"
-    "结尾停在仍在继续的互动节点，不要写成总结、落幕、升华或强行收束。"
+    "严禁替用户补写未在本轮输入中明确出现的动作、台词、心理、决定、情绪结论和身体反应。\n"
+    "可以承接或引用用户已经明确写出的动作、姿态、位置和可见状态，但不得新增、改写或推进用户未写出的行为。\n"
+    "用户只能由用户自己推进；你的主要描写对象应是非用户角色、环境和当前场景变化。\n"
+    "优先通过非用户角色的细微反应承接当前情绪，例如眼神、停顿、呼吸、手指动作、身体距离、语气变化。\n"
+    "若场景不适合，不要强行堆叠动作描写。\n"
+    "不要直接用“她很感动 / 她很害羞 / 她很难过”等情绪结论替代描写。\n"
+    "优先通过动作、对白、停顿和场景互动表现情绪。\n"
+    "避免反复使用同一种细微动作或固定句式。\n"
+    "不要频繁重复“浅笑、垂眸、指尖、呼吸一滞、偏了偏头”等相似表达。\n"
+    "保持角色原本的语气、性格和当前预设文风。\n"
+    "不要为了执行本规则，把所有角色都写成温柔、克制、含蓄的同一种口吻。\n"
+    "若当前角色卡、预设或用户输入中要求输出状态变量、好感变量、信任变量或类似结尾标签，则这些标签视为强制输出格式，每轮不得省略。 \n"
+    "状态变量必须放在整条回复的最后，作为独立区块输出，不得混入正文叙述、旁白或角色台词中。 \n"
+    "即使本轮关系没有明显变化，也必须按既定格式输出无变化状态，例如使用+0或原角色卡指定的无变化写法。 \n"
+    "不得用“她更加信任你了 / 好感提升 / 关系变近了”等正文描述替代状态变量标签。 \n"
+    "如果角色卡或预设已经指定了状态变量格式，必须优先沿用原格式，不得自行改名、改格式或省略字段。 \n"
+    "若当前预设要求输出TTS标签，则只有角色直接台词可以附带TTS标签，旁白、动作、环境描写和心理描写不得附带TTS标签。 \n"
+    "TTS标签必须严格使用预设指定格式，不得解释标签含义，不得把隐藏标签当作正文内容复述。 \n"
+    "结尾应停在仍可继续互动的位置，不要写成总结、落幕、升华、回顾或明显收束。"
 )
 
 
@@ -193,11 +209,34 @@ def build_sprite_prompt(llm_config: dict[str, Any]) -> str:
     )
 
 
+def strip_thought_blocks(text: Any) -> str:
+    """Keep stored chat intact, but remove <think>...</think> blocks before building prompts."""
+    content = str(text or "")
+
+    # Remove completed thinking blocks.
+    content = re.sub(
+        r"<think\b[^>]*>.*?</think>",
+        "",
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    # Remove an unfinished thinking block if a streamed reply was interrupted.
+    content = re.sub(
+        r"<think\b[^>]*>.*$",
+        "",
+        content,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    return content.strip()
+
+
 def build_conversation_transcript(history: list[dict[str, Any]]) -> str:
     lines: list[str] = []
     for item in history:
         role = item.get("role", "")
-        content = str(item.get("content", "")).strip()
+        content = strip_thought_blocks(item.get("content", ""))
         if role not in {"user", "assistant"} or not content:
             continue
         speaker = "User" if role == "user" else "AI"
@@ -237,13 +276,29 @@ def build_prompt_package(
     system_prompt = str(persona.get("system_prompt", "")).strip()
     memory_recap_prompt = build_memory_recap_prompt(memories)
     user_profile_prompt = build_user_profile_prompt(user_profile)
+    worldbook_stable_prompt = build_worldbook_prompt(
+        worldbook_buckets.get("stable", []),
+        heading="The following are stable worldbook notes for durable setting, character grounding, and long-running RP consistency.",
+    )
+    worldbook_current_state_prompt = build_worldbook_prompt(
+        worldbook_buckets.get("current_state", []),
+        heading="The following worldbook notes describe the current chapter, location, relationship, or temporary state.",
+    )
     worldbook_before_char_defs_prompt = build_worldbook_prompt(
-        worldbook_buckets["before_char_defs"],
+        worldbook_buckets.get("before_char_defs", []),
         heading="The following worldbook notes must be considered before the character definition.",
     )
     worldbook_after_char_defs_prompt = build_worldbook_prompt(
-        worldbook_buckets["after_char_defs"],
+        worldbook_buckets.get("after_char_defs", []),
         heading="The following worldbook notes refine or extend the character definition for this turn.",
+    )
+    worldbook_dynamic_prompt = build_worldbook_prompt(
+        worldbook_buckets.get("dynamic", []),
+        heading="The following worldbook notes are temporary turn-level hints for the current message.",
+    )
+    worldbook_output_guard_prompt = build_worldbook_prompt(
+        worldbook_buckets.get("output_guard", []),
+        heading="The following worldbook notes are final output-format rules for this turn.",
     )
     worldbook_answer_guard = build_worldbook_answer_guard(user_message, matched_worldbook_entries)
     retrieval_prompt = build_retrieval_prompt(recalled_memories)
@@ -261,10 +316,13 @@ def build_prompt_package(
             preset_prompt,
             worldbook_before_char_defs_prompt,
             system_prompt,
+            worldbook_stable_prompt,
             worldbook_after_char_defs_prompt,
             memory_recap_prompt,
             user_profile_prompt,
+            worldbook_current_state_prompt,
             retrieval_prompt,
+            worldbook_dynamic_prompt,
             worldbook_answer_guard,
             sprite_prompt,
         ]
@@ -304,14 +362,22 @@ def build_prompt_package(
         append_in_chat_bucket(tail_depth)
 
         role = str(item.get("role", "assistant")).strip() or "assistant"
-        content = str(item.get("content", "")).strip()
+        content = strip_thought_blocks(item.get("content", ""))
         if content:
             messages.append({"role": role, "content": content})
 
     append_in_chat_bucket(0)
 
-    if preset_output_guard_prompt:
-        messages.append({"role": "system", "content": preset_output_guard_prompt})
+    final_guard_sections = [
+        prompt
+        for prompt in [
+            preset_output_guard_prompt,
+            worldbook_output_guard_prompt,
+        ]
+        if str(prompt or "").strip()
+    ]
+    if final_guard_sections:
+        messages.append({"role": "system", "content": "\n\n".join(final_guard_sections)})
 
     clean_user_message = str(user_message or "").strip()
     messages.append({"role": "user", "content": clean_user_message})
@@ -332,71 +398,91 @@ def build_prompt_package(
         layers.append(layer)
 
     append_layer(
-        "system_main",
-        "系统提示词 / 主提示",
+        "preset_rules",
+        "预设规则：基础系统规则 / 常用模块",
         [preset_prompt],
-        section_count=1 if preset_prompt else 0,
+        preset_section_count=1 if preset_prompt else 0,
     )
     append_layer(
         "worldbook_before_char_defs",
-        "世界书（角色定义前）",
+        "角色定义前世界书：高优先级前置设定",
         [worldbook_before_char_defs_prompt],
-        hit_count=len(worldbook_buckets["before_char_defs"]),
+        hit_count=len(worldbook_buckets.get("before_char_defs", [])),
     )
     append_layer(
-        "role_card",
-        "角色卡固定设定",
+        "character_definition",
+        "角色卡：人物设定 / 场景 / 示例对话",
         [system_prompt],
         character_name=str(persona.get("name", "")).strip(),
     )
     append_layer(
-        "worldbook_after_char_defs",
-        "世界书（角色定义后）",
-        [worldbook_after_char_defs_prompt],
-        hit_count=len(worldbook_buckets["after_char_defs"]),
+        "stable_worldbook",
+        "稳定世界书：常驻设定 / 固定世界观",
+        [worldbook_stable_prompt],
+        stable_worldbook_count=len(worldbook_buckets.get("stable", [])),
     )
     append_layer(
-        "memory_context",
-        "记忆 / 摘要 / 长期信息",
-        [memory_recap_prompt, retrieval_prompt, user_profile_prompt],
+        "worldbook_after_char_defs",
+        "角色定义后世界书：角色补充设定",
+        [worldbook_after_char_defs_prompt],
+        hit_count=len(worldbook_buckets.get("after_char_defs", [])),
+    )
+    append_layer(
+        "memory_and_user_profile",
+        "长期记忆与用户资料",
+        [memory_recap_prompt, user_profile_prompt],
         stored_memory_count=len(memories),
+        has_user_profile=bool(user_profile_prompt),
+    )
+    append_layer(
+        "current_state_context",
+        "当前状态区：地点 / 章节 / 关系状态",
+        [worldbook_current_state_prompt],
+        hit_count=len(worldbook_buckets.get("current_state", [])),
+    )
+    append_layer(
+        "retrieval_context",
+        "本轮相关记忆：检索召回",
+        [retrieval_prompt],
         recalled_memory_count=len(recalled_memories),
+    )
+    append_layer(
+        "dynamic_worldbook",
+        "本轮命中世界书：关键词 / 递归 / 临时提示",
+        [worldbook_dynamic_prompt],
+        hit_count=len(worldbook_buckets.get("dynamic", [])),
     )
     for depth in sorted(in_chat_buckets):
         append_layer(
             f"worldbook_in_chat_depth_{depth}",
-            f"世界书（聊天深度 {depth}）",
+            f"聊天深度世界书：插入聊天记录附近 depth {depth}",
             [build_worldbook_prompt(in_chat_buckets[depth], heading=f"In-chat depth {depth}")],
             hit_count=len(in_chat_buckets[depth]),
             depth=depth,
         )
     append_layer(
         "worldbook_answer_guard",
-        "世界书回答守卫",
+        "设定问答提示：直接问设定时使用",
         [worldbook_answer_guard],
         hit_count=len(matched_worldbook_entries),
     )
     append_layer(
-        "output_rules",
-        "输出格式约束",
-        [sprite_prompt],
-        sprite_enabled=bool(llm_config.get("sprite_enabled", False)),
-    )
-    append_layer(
         "recent_history",
-        "最近聊天记录",
+        "最近聊天记录：已移除思考链",
         [recent_history_text],
         turn_count=len(recent_history),
     )
     append_layer(
         "final_output_guard",
-        "本轮输出守卫（V4F）",
-        [preset_output_guard_prompt],
-        enabled=bool(preset_output_guard_prompt),
+        "输出格式规则：V4F稳定器 / TTS / 状态变量",
+        [sprite_prompt, preset_output_guard_prompt, worldbook_output_guard_prompt],
+        sprite_enabled=bool(llm_config.get("sprite_enabled", False)),
+        preset_guard_enabled=bool(preset_output_guard_prompt),
+        output_worldbook_count=len(worldbook_buckets.get("output_guard", [])),
     )
     append_layer(
         "user_input",
-        "本轮新输入",
+        "本轮用户输入：当前这句话",
         [clean_user_message],
         char_count=len(clean_user_message),
     )
@@ -439,6 +525,7 @@ __all__ = [
     "build_retrieval_prompt",
     "build_sprite_prompt",
     "build_user_profile_prompt",
+    "strip_thought_blocks",
     "build_worldbook_answer_guard",
     "build_worldbook_prompt",
 ]

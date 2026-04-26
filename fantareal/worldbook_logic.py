@@ -23,6 +23,9 @@ DEFAULT_WORLDBOOK_SETTINGS = {
     "default_injection_role": "system",               # 当前节点只真正支持 system
     "default_injection_order": 100,                   # 同位置内的二次排序
 
+    # RP 分层：默认保持旧逻辑，不主动改变老词条位置
+    "default_prompt_layer": "follow_position",       # follow_position / stable / current_state / dynamic / output_guard
+
     # 递归 V1
     "recursive_scan_enabled": False,
     "recursion_max_depth": 2,
@@ -92,6 +95,11 @@ def _normalize_injection_depth(value: Any, default: int = 0) -> int:
 
 def _normalize_injection_order(value: Any, default: int = 100) -> int:
     return _clamp_int(value, 0, 999999, default)
+
+
+def _normalize_prompt_layer(value: Any, default: str = "follow_position") -> str:
+    text = str(value or "").strip().lower()
+    return text if text in {"follow_position", "stable", "current_state", "dynamic", "output_guard"} else default
 
 
 def _normalize_recursion_depth(value: Any, default: int = 2) -> int:
@@ -166,6 +174,10 @@ def sanitize_worldbook_settings(raw: Any) -> dict[str, Any]:
     settings["default_injection_order"] = _normalize_injection_order(
         raw.get("default_injection_order"),
         settings["default_injection_order"],
+    )
+    settings["default_prompt_layer"] = _normalize_prompt_layer(
+        raw.get("default_prompt_layer"),
+        settings["default_prompt_layer"],
     )
     settings["recursive_scan_enabled"] = _normalize_yes_no_bool(
         raw.get("recursive_scan_enabled"),
@@ -255,6 +267,10 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
         raw.get("injection_order", raw_order),
         int(settings.get("default_injection_order", 100)),
     )
+    prompt_layer = _normalize_prompt_layer(
+        raw.get("prompt_layer"),
+        str(settings.get("default_prompt_layer", "follow_position")),
+    )
 
     recursive_enabled = _normalize_yes_no_bool(raw.get("recursive_enabled"), True)
     prevent_further_recursion = _normalize_yes_no_bool(raw.get("prevent_further_recursion"), False)
@@ -289,6 +305,7 @@ def sanitize_worldbook_entry(raw: Any, *, index: int, settings: dict[str, Any]) 
         "injection_depth": injection_depth,
         "injection_role": injection_role,
         "injection_order": injection_order,
+        "prompt_layer": prompt_layer,
         "recursive_enabled": recursive_enabled,
         "prevent_further_recursion": prevent_further_recursion,
         "enabled": enabled,

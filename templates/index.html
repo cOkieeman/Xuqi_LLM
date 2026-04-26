@@ -540,6 +540,61 @@
         color: var(--muted);
         font-size: 0.8rem;
       }
+
+      .worldbook-debug-rail {
+        z-index: 35;
+        overflow: visible;
+      }
+      .worldbook-debug-rail .worldbook-rail-toggle {
+        z-index: 4;
+      }
+      .chat-layout.worldbook-rail-collapsed .worldbook-debug-rail .worldbook-rail-content {
+        display: none;
+      }
+      .worldbook-debug-rail.expanded {
+        width: min(560px, calc(100vw - 2rem));
+        min-width: min(560px, calc(100vw - 2rem));
+        border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
+        box-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+        backdrop-filter: blur(16px);
+      }
+      html[data-theme="light"] .worldbook-debug-rail.expanded {
+        background: rgba(255, 250, 244, 0.97);
+      }
+      html[data-theme="dark"] .worldbook-debug-rail.expanded {
+        background: rgba(18, 27, 37, 0.97);
+      }
+      .worldbook-debug-rail .worldbook-rail-content {
+        overflow-y: auto;
+        max-height: calc(100vh - 9rem);
+        padding: 0.85rem 0.95rem 0.95rem 1.05rem;
+      }
+      .worldbook-debug-rail .worldbook-debug-panel {
+        margin: 0;
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        padding: 0.65rem 0 0;
+      }
+      .worldbook-debug-rail .drawer-debug-head {
+        margin-bottom: 0.75rem;
+      }
+      .worldbook-debug-rail .worldbook-debug-body {
+        display: block;
+        margin-top: 0.75rem;
+      }
+      .worldbook-debug-rail .worldbook-debug-groups {
+        gap: 0.7rem;
+      }
+      .worldbook-debug-rail .worldbook-debug-group,
+      .worldbook-debug-rail .worldbook-debug-item,
+      .worldbook-debug-rail .worldbook-debug-empty {
+        background: color-mix(in srgb, var(--input-bg) 92%, var(--panel-strong));
+      }
+      .worldbook-debug-rail .debug-code-block {
+        max-height: 14rem;
+        overflow: auto;
+      }
       @media (max-width: 768px) {
         .worldbook-debug-toggle {
           gap: 0.75rem;
@@ -555,7 +610,6 @@
   <body>
     <div class="topbar topbar-chat">
       <div class="topbar-left">
-        <button id="open-drawer" class="menu-button" type="button">Config</button>
         <a class="brand" href="/chat">Xuqi LLM Chat</a>
       </div>
       {% include "_grouped_nav.html" %}
@@ -563,22 +617,44 @@
 
     <div class="chat-shell">
       <div id="chat-layout" class="chat-layout worldbook-rail-collapsed">
-        <aside id="worldbook-hit-rail" class="worldbook-hit-rail panel" aria-label="Worldbook 命中">
-          <button id="toggle-worldbook-rail" class="worldbook-rail-toggle" type="button" aria-expanded="false" aria-controls="worldbook-rail-content" title="展开 Worldbook 命中">
+        {% if worldbook_settings.debug_enabled %}
+        <aside id="worldbook-hit-rail" class="worldbook-hit-rail worldbook-debug-rail panel" aria-label="Worldbook Debug">
+          <button id="toggle-worldbook-rail" class="worldbook-rail-toggle" type="button" aria-expanded="false" aria-controls="worldbook-rail-content" title="展开 Worldbook Debug">
             <span id="worldbook-rail-arrow" class="worldbook-rail-arrow" aria-hidden="true">›</span>
             <span id="worldbook-rail-count" class="worldbook-rail-count" aria-label="Worldbook 命中数量" hidden>0</span>
           </button>
           <div id="worldbook-rail-content" class="worldbook-rail-content">
-            <div class="section-head">
-              <p class="eyebrow">Worldbook</p>
-              <h2>命中</h2>
+            <div class="worldbook-debug-panel expanded" id="worldbook-debug-panel">
+              <div class="drawer-debug-head">
+                <div class="drawer-debug-meta">
+                  <span class="drawer-debug-title">Worldbook Debug</span>
+                  <span id="worldbook-debug-status" class="debug-status-chip">No Hit</span>
+                  <span id="worldbook-debug-count" class="muted">暂无命中</span>
+                </div>
+              </div>
+              <div id="worldbook-debug-body" class="worldbook-debug-body">
+                <div id="worldbook-debug-summary" class="worldbook-debug-summary"></div>
+
+                <div id="worldbook-debug-filters" class="worldbook-debug-filters" hidden>
+                  <button type="button" class="secondary compact active" data-debug-filter="all">全部</button>
+                  <button type="button" class="secondary compact" data-debug-filter="selected">只看已注入</button>
+                  <button type="button" class="secondary compact" data-debug-filter="dropped">只看未注入</button>
+                  <button type="button" class="secondary compact" data-debug-filter="recursive">只看递归链</button>
+                </div>
+
+                <div id="worldbook-debug-groups" class="worldbook-debug-groups">
+                  <div class="worldbook-debug-empty">当前轮没有可展示的 Worldbook Debug。</div>
+                </div>
+
+                <details class="worldbook-debug-raw-wrap">
+                  <summary>查看原始调试文本</summary>
+                  <pre id="worldbook-debug-prompt" class="debug-code-block">本轮 Worldbook 调试文本会显示在这里。</pre>
+                </details>
+              </div>
             </div>
-            <div class="worldbook-rail-list" id="worldbook-bar" hidden>
-              <div class="retrieval-items worldbook-rail-items" id="worldbook-items"></div>
-            </div>
-            <div id="worldbook-empty" class="worldbook-rail-empty">暂无命中</div>
           </div>
         </aside>
+        {% endif %}
 
         <main class="chat-area standalone">
           <div class="chat-header">
@@ -616,36 +692,6 @@
           <div class="retrieval-bar" id="retrieval-bar" hidden>
             <div class="retrieval-title">记忆命中</div>
             <div class="retrieval-items" id="retrieval-items"></div>
-          </div>
-
-          <div class="retrieval-bar worldbook-debug-panel" id="worldbook-debug-panel" {% if not worldbook_settings.debug_enabled %}hidden{% endif %}>
-            <button id="worldbook-debug-toggle" class="worldbook-debug-toggle" type="button" aria-expanded="false">
-              <div class="worldbook-debug-toggle-main">
-                <div class="retrieval-title">Worldbook Debug</div>
-                <div class="debug-status-row">
-                  <span id="worldbook-debug-status" class="debug-status-chip">No Hit</span>
-                  <span id="worldbook-debug-count" class="muted">暂无命中</span>
-                </div>
-              </div>
-              <span id="worldbook-debug-arrow" class="worldbook-debug-arrow" aria-hidden="true">▾</span>
-            </button>
-            <div id="worldbook-debug-body" class="worldbook-debug-body" hidden>
-              <div id="worldbook-debug-summary" class="worldbook-debug-summary"></div>
-
-              <div id="worldbook-debug-filters" class="worldbook-debug-filters" hidden>
-                <button type="button" class="secondary compact active" data-debug-filter="all">全部</button>
-                <button type="button" class="secondary compact" data-debug-filter="selected">只看已注入</button>
-                <button type="button" class="secondary compact" data-debug-filter="dropped">只看未注入</button>
-                <button type="button" class="secondary compact" data-debug-filter="recursive">只看递归链</button>
-              </div>
-
-              <div id="worldbook-debug-groups" class="worldbook-debug-groups"></div>
-
-              <details class="worldbook-debug-raw-wrap">
-                <summary>查看原始调试文本</summary>
-                <pre id="worldbook-debug-prompt" class="debug-code-block">点击上方箭头展开后，可查看本轮 Worldbook 调试文本。</pre>
-              </details>
-            </div>
           </div>
 
           <div id="messages" class="messages">
@@ -1806,7 +1852,7 @@
           worldbookRailArrowEl.textContent = shouldExpand ? "‹" : "›";
         }
         if (worldbookRailToggleEl) {
-          worldbookRailToggleEl.title = shouldExpand ? "收起 Worldbook 命中" : "展开 Worldbook 命中";
+          worldbookRailToggleEl.title = shouldExpand ? "收起 Worldbook Debug" : "展开 Worldbook Debug";
         }
       }
 
@@ -1820,6 +1866,9 @@
         if (worldbookRailCountEl) {
           worldbookRailCountEl.textContent = String(hitCount);
           worldbookRailCountEl.hidden = hitCount <= 0;
+        }
+        if (!worldbookItemsEl || !worldbookBarEl) {
+          return;
         }
         if (!Array.isArray(items) || items.length === 0) {
           worldbookItemsEl.innerHTML = "";
@@ -1839,19 +1888,14 @@
       }
 
       function setWorldbookDebugCollapsed(collapsed) {
-        worldbookDebugCollapsed = !!collapsed;
+        // Debug 现在由左侧 rail 负责展开/收起；rail 展开后内容始终可见。
+        worldbookDebugCollapsed = false;
         if (worldbookDebugBodyEl) {
-          worldbookDebugBodyEl.hidden = worldbookDebugCollapsed;
-        }
-        if (worldbookDebugToggleEl) {
-          worldbookDebugToggleEl.setAttribute("aria-expanded", String(!worldbookDebugCollapsed));
-          worldbookDebugToggleEl.title = worldbookDebugCollapsed ? "展开 Worldbook Debug" : "收起 Worldbook Debug";
-        }
-        if (worldbookDebugArrowEl) {
-          worldbookDebugArrowEl.textContent = worldbookDebugCollapsed ? "▾" : "▴";
+          worldbookDebugBodyEl.hidden = false;
         }
         if (worldbookDebugPanelEl) {
-          worldbookDebugPanelEl.classList.toggle("expanded", !worldbookDebugCollapsed);
+          worldbookDebugPanelEl.hidden = false;
+          worldbookDebugPanelEl.classList.add("expanded");
         }
       }
 
@@ -1868,6 +1912,7 @@
 
         const items = sourceItems.map((item, index) => {
           const entryId = String(item?.id || "").trim();
+          const promptLayer = String(item?.prompt_layer || item?.promptLayer || "follow_position").trim() || "follow_position";
           const insertionPosition = String(item?.insertion_position || item?.insertionPosition || "after_char_defs").trim() || "after_char_defs";
           const injectionDepth = Number.isFinite(Number(item?.injection_depth)) ? Number(item.injection_depth) : (Number.isFinite(Number(item?.injectionDepth)) ? Number(item.injectionDepth) : 0);
           const selectedFlag = item?.selected_for_prompt !== undefined ? item.selected_for_prompt : item?.selectedForPrompt;
@@ -1879,7 +1924,19 @@
 
           let bucketKey = insertionPosition;
           let bucketLabel = "世界书（未分类）";
-          if (insertionPosition === "before_char_defs") {
+          if (promptLayer === "stable") {
+            bucketKey = "stable";
+            bucketLabel = "世界书（稳定区）";
+          } else if (promptLayer === "current_state") {
+            bucketKey = "current_state";
+            bucketLabel = "世界书（当前状态区）";
+          } else if (promptLayer === "dynamic") {
+            bucketKey = "dynamic";
+            bucketLabel = "世界书（动态区）";
+          } else if (promptLayer === "output_guard") {
+            bucketKey = "output_guard";
+            bucketLabel = "世界书（输出协议区）";
+          } else if (insertionPosition === "before_char_defs") {
             bucketKey = "before_char_defs";
             bucketLabel = "世界书（角色定义前）";
           } else if (insertionPosition === "after_char_defs") {
@@ -1897,6 +1954,7 @@
             trigger: String(item?.trigger || "").trim(),
             matched: String(item?.matched || item?.trigger || "").trim(),
             contentPreview: String(item?.content_preview || item?.content || "").trim(),
+            promptLayer,
             insertionPosition,
             injectionDepth,
             injectionOrder: Number.isFinite(Number(item?.injection_order)) ? Number(item.injection_order) : (Number.isFinite(Number(item?.injectionOrder)) ? Number(item.injectionOrder) : null),
@@ -2010,8 +2068,12 @@
 
         const visibleItems = getWorldbookDebugVisibleItems(Array.isArray(debugState?.items) ? debugState.items : []);
         const groupOrder = [
+          "stable",
+          "current_state",
           "before_char_defs",
           "after_char_defs",
+          "dynamic",
+          "output_guard",
           "in_chat_0",
           "in_chat_1",
           "in_chat_2",
@@ -2079,7 +2141,12 @@
             const tagRow = document.createElement("div");
             tagRow.className = "worldbook-debug-tag-row";
             tagRow.appendChild(makeWorldbookDebugTag(item.selectedForPrompt ? "已注入" : "未注入", item.selectedForPrompt ? "selected" : "dropped"));
-            tagRow.appendChild(makeWorldbookDebugTag(formatWorldbookPositionLabel(item)));
+            if (item.promptLayer && item.promptLayer !== "follow_position") {
+              const layerLabels = { stable: "稳定区", current_state: "当前状态", dynamic: "动态区", output_guard: "输出协议" };
+              tagRow.appendChild(makeWorldbookDebugTag(layerLabels[item.promptLayer] || item.promptLayer));
+            } else {
+              tagRow.appendChild(makeWorldbookDebugTag(formatWorldbookPositionLabel(item)));
+            }
             if (item.matchedDepth > 0 || item.matchedFrom) {
               tagRow.appendChild(makeWorldbookDebugTag(`递归层级 ${item.matchedDepth}`));
             } else {
@@ -2148,16 +2215,12 @@
       }
 
       function renderWorldbookDebug(debug) {
-        if (!worldbookDebugEnabled) {
-          if (worldbookDebugPanelEl) {
-            worldbookDebugPanelEl.hidden = true;
-          }
+        if (!worldbookDebugEnabled || !worldbookDebugPanelEl || !worldbookDebugStatusEl || !worldbookDebugCountEl || !worldbookDebugPromptEl) {
           return;
         }
 
-        if (worldbookDebugPanelEl) {
-          worldbookDebugPanelEl.hidden = false;
-        }
+        worldbookDebugPanelEl.hidden = false;
+        setWorldbookDebugCollapsed(false);
 
         const normalized = normalizeWorldbookDebug(debug || {});
         lastWorldbookDebugPayload = normalized;
@@ -2173,7 +2236,7 @@
           if (worldbookDebugSummaryEl) worldbookDebugSummaryEl.innerHTML = "";
           if (worldbookDebugGroupsEl) worldbookDebugGroupsEl.innerHTML = '<div class="worldbook-debug-empty">当前轮没有可展示的 Worldbook 调试信息。</div>';
           if (worldbookDebugFiltersEl) worldbookDebugFiltersEl.hidden = true;
-          setWorldbookDebugCollapsed(true);
+          setWorldbookDebugCollapsed(false);
           return;
         }
 
@@ -2191,7 +2254,7 @@
 
         const rawPrompt = normalized.prompt || allItems.map((item) => item.trigger || item.title).join("\n");
         worldbookDebugPromptEl.textContent = rawPrompt;
-        setWorldbookDebugCollapsed(worldbookDebugCollapsed);
+        setWorldbookDebugCollapsed(false);
       }
 
 
@@ -2885,7 +2948,7 @@
         window.location.href = "/api/export/history";
       });
 
-      document.getElementById("open-drawer").addEventListener("click", openDrawer);
+      document.getElementById("open-drawer")?.addEventListener("click", openDrawer);
       document.getElementById("open-drawer-secondary").addEventListener("click", openDrawer);
       document.getElementById("close-drawer").addEventListener("click", closeDrawer);
       drawerOverlayEl.addEventListener("click", closeDrawer);
@@ -2952,7 +3015,7 @@
       applyUiOpacity(runtimeState.ui_opacity);
       applyBackground(runtimeState.background_image_url, runtimeState.background_overlay);
       syncDrawerFromState();
-      setWorldbookDebugCollapsed(true);
+      setWorldbookDebugCollapsed(false);
       hydrateExistingMessages();
       loadPresetStoreForChat().catch(() => {
         presetDebugPanelEl.hidden = true;
